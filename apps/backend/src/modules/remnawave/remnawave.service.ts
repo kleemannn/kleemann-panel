@@ -11,6 +11,18 @@ export interface RemnaCreateUserInput {
   description?: string;
   telegramId?: number;
   status?: 'ACTIVE' | 'DISABLED';
+  hwidDeviceLimit?: number;
+}
+
+export interface RemnaHwidDevice {
+  hwid: string;
+  userUuid: string;
+  platform: string | null;
+  osVersion: string | null;
+  deviceModel: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RemnaUser {
@@ -108,6 +120,19 @@ export class RemnawaveService {
   async userUsage(uuid: string, start: string, end: string): Promise<unknown> {
     const { data } = await this.http.get(`/api/users/${uuid}/usage`, { params: { start, end } });
     return data.response ?? data;
+  }
+
+  // ---- HWID devices ----
+  async listUserHwidDevices(userUuid: string): Promise<{ total: number; devices: RemnaHwidDevice[] }> {
+    const { data } = await this.http.get(`/api/hwid/devices/${userUuid}`);
+    const r = data.response ?? data;
+    return { total: r.total ?? 0, devices: (r.devices ?? []) as RemnaHwidDevice[] };
+  }
+
+  async deleteUserHwidDevice(userUuid: string, hwid: string): Promise<{ total: number; devices: RemnaHwidDevice[] }> {
+    const { data } = await this.http.post('/api/hwid/devices/delete', { userUuid, hwid });
+    const r = data.response ?? data;
+    return { total: r.total ?? 0, devices: (r.devices ?? []) as RemnaHwidDevice[] };
   }
 
   // ---- Squads ----

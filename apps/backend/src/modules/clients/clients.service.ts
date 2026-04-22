@@ -77,20 +77,24 @@ export class ClientsService {
     const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId } });
     if (!reseller) throw new NotFoundException('Reseller not found');
     if (!reseller.isActive) throw new ForbiddenException('Reseller is disabled');
-    if (reseller.expiresAt && reseller.expiresAt.getTime() < Date.now()) {
-      throw new ForbiddenException('Reseller account expired');
+
+    const isAdmin = reseller.role === 'ADMIN';
+
+    if (!isAdmin) {
+      if (reseller.expiresAt && reseller.expiresAt.getTime() < Date.now()) {
+        throw new ForbiddenException('Reseller account expired');
+      }
+      const used = await this.prisma.client.count({ where: { resellerId } });
+      if (used >= reseller.maxClients) {
+        throw new ForbiddenException(
+          `Client quota exceeded (${used}/${reseller.maxClients}). Contact admin to increase.`,
+        );
+      }
     }
 
-    const used = await this.prisma.client.count({ where: { resellerId } });
-    if (used >= reseller.maxClients) {
-      throw new ForbiddenException(
-        `Client quota exceeded (${used}/${reseller.maxClients}). Contact admin to increase.`,
-      );
-    }
-
-    // Clamp client expiration to reseller expiration if set
+    // Clamp client expiration to reseller expiration (resellers only; admins are uncapped)
     let expireAt = new Date(Date.now() + dto.durationDays * 864e5);
-    if (reseller.expiresAt && expireAt > reseller.expiresAt) {
+    if (!isAdmin && reseller.expiresAt && expireAt > reseller.expiresAt) {
       expireAt = reseller.expiresAt;
     }
 

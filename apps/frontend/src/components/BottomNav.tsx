@@ -12,8 +12,8 @@ const items = [
 const adminItems = [
   { to: '/', label: 'Главная', emoji: '🏠' },
   { to: '/admin/resellers', label: 'Реселлеры', emoji: '🛒' },
-  { to: '/admin/squads', label: 'Squads', emoji: '🧩' },
-  { to: '/admin/audit', label: 'Audit', emoji: '📋' },
+  { to: '/clients', label: 'Клиенты', emoji: '👥' },
+  { to: '/clients/new', label: 'Создать', emoji: '➕' },
 ];
 
 export function BottomNav() {

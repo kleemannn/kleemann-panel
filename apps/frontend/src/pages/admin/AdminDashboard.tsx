@@ -34,6 +34,12 @@ export function AdminDashboard() {
         <Link to="/admin/resellers/new">
           <Button full>➕ Новый реселлер</Button>
         </Link>
+        <Link to="/clients">
+          <Button full variant="secondary">👥 Клиенты</Button>
+        </Link>
+        <Link to="/clients/new">
+          <Button full>➕ Новый клиент</Button>
+        </Link>
         <Link to="/admin/squads">
           <Button full variant="secondary">🧩 Squads</Button>
         </Link>

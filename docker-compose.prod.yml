@@ -1,0 +1,33 @@
+# Production override for deploying Kleemann Panel alongside Remnawave on the same VPS.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Assumes DigneZzZ's Remnawave installer is already running. We:
+#   1. Do not expose postgres / backend / frontend ports on the host — Caddy proxies everything.
+#   2. Attach backend + frontend to Remnawave's external Docker network so backend can reach
+#      the panel by service name (no public traffic between panel and backend).
+#   3. Let Caddy reach our services on the same network by service name.
+
+services:
+  postgres:
+    ports: !reset []
+
+  backend:
+    ports: !reset []
+    networks:
+      - default
+      - remnawave
+
+  frontend:
+    ports: !reset []
+    networks:
+      - default
+      - remnawave
+
+networks:
+  # Rename `remnawave` below if your Remnawave docker network is named differently.
+  # Check with:  docker network ls | grep -i remna
+  remnawave:
+    external: true
+    name: remnawave-network

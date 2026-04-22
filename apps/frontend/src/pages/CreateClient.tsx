@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
-const PRESETS = [30, 90, 180, 365];
+const PRESETS = [7, 30];
 
 export function CreateClient() {
   const navigate = useNavigate();

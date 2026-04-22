@@ -49,6 +49,10 @@ export function App() {
             <Route path="/admin/resellers/:id" element={<ResellerEdit />} />
             <Route path="/admin/squads" element={<Squads />} />
             <Route path="/admin/audit" element={<Audit />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/clients/new" element={<CreateClient />} />
+            <Route path="/clients/:id" element={<ClientDetails />} />
+            <Route path="/clients/:id/extend" element={<Extend />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (

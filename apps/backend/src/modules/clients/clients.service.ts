@@ -160,10 +160,13 @@ export class ClientsService {
 
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     if (!reseller.isActive) throw new ForbiddenException('Reseller is disabled');
+    const isAdmin = reseller.role === 'ADMIN';
 
     const base = c.expiresAt && c.expiresAt > new Date() ? c.expiresAt : new Date();
     let newExpire = new Date(base.getTime() + dto.durationDays * 864e5);
-    if (reseller.expiresAt && newExpire > reseller.expiresAt) newExpire = reseller.expiresAt;
+    if (!isAdmin && reseller.expiresAt && newExpire > reseller.expiresAt) {
+      newExpire = reseller.expiresAt;
+    }
 
     await this.remna.updateUser(c.remnawaveUuid, {
       expireAt: newExpire.toISOString(),

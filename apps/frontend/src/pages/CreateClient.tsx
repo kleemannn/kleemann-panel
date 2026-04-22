@@ -26,8 +26,10 @@ export function CreateClient() {
       const body: Record<string, unknown> = { username, durationDays };
       if (!unlimited) body.trafficLimitGb = Number(trafficGb);
       if (note) body.note = note;
-      const parsedLimit = Number(deviceLimit);
-      if (Number.isFinite(parsedLimit) && parsedLimit >= 0) body.hwidDeviceLimit = parsedLimit;
+      if (deviceLimit.trim() !== '') {
+        const parsedLimit = Number(deviceLimit);
+        if (Number.isFinite(parsedLimit) && parsedLimit >= 0) body.hwidDeviceLimit = parsedLimit;
+      }
       const { data } = await api.post('/clients', body);
       return data;
     },

@@ -16,6 +16,16 @@ interface Client {
   subscriptionUrl?: string | null;
 }
 
+interface HwidDevice {
+  hwid: string;
+  platform: string | null;
+  osVersion: string | null;
+  deviceModel: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function ClientDetails() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
@@ -31,6 +41,24 @@ export function ClientDetails() {
     queryFn: async () =>
       (await api.get<{ subscriptionUrl: string | null }>(`/clients/${id}/subscription`)).data,
     enabled: !!q.data,
+  });
+
+  const devices = useQuery({
+    queryKey: ['client', id, 'devices'],
+    queryFn: async () =>
+      (await api.get<{ total: number; devices: HwidDevice[] }>(`/clients/${id}/devices`)).data,
+    enabled: !!q.data,
+  });
+
+  const deleteDevice = useMutation({
+    mutationFn: async (hwid: string) => {
+      await api.delete(`/clients/${id}/devices/${encodeURIComponent(hwid)}`);
+    },
+    onSuccess: () => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['client', id, 'devices'] });
+    },
+    onError: () => tgHapticError(),
   });
 
   const act = (path: string, method: 'post' | 'delete' = 'post') =>
@@ -99,6 +127,49 @@ export function ClientDetails() {
           ) : '—'
         } />
       </Card>
+
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">
+            Устройства {devices.data ? `(${devices.data.total})` : ''}
+          </h2>
+        </div>
+        {devices.isLoading ? (
+          <p className="text-tg-hint text-sm">Загрузка…</p>
+        ) : !devices.data || devices.data.devices.length === 0 ? (
+          <p className="text-tg-hint text-sm">Нет подключённых устройств</p>
+        ) : (
+          <ul className="space-y-2">
+            {devices.data.devices.map((dev) => (
+              <li key={dev.hwid}>
+                <Card className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {dev.deviceModel || dev.platform || 'Устройство'}
+                    </p>
+                    <p className="text-xs text-tg-hint truncate">
+                      {[dev.platform, dev.osVersion].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                    <p className="text-xs text-tg-hint font-mono truncate">{dev.hwid}</p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    onClick={() =>
+                      window.Telegram?.WebApp?.showConfirm?.(
+                        'Отвязать устройство?',
+                        (ok) => ok && deleteDevice.mutate(dev.hwid),
+                      ) ?? (confirm('Отвязать устройство?') && deleteDevice.mutate(dev.hwid))
+                    }
+                    disabled={deleteDevice.isPending}
+                  >
+                    🗑
+                  </Button>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="grid grid-cols-2 gap-2">
         <Link to={`/clients/${c.id}/extend`}>

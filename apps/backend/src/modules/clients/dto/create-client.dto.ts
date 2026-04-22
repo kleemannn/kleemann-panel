@@ -37,4 +37,11 @@ export class CreateClientDto {
   @IsString()
   @Matches(/^\d+$/, { message: 'clientTelegramId must be a numeric string' })
   clientTelegramId?: string;
+
+  // 0 = unlimited, default 1
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  hwidDeviceLimit?: number;
 }

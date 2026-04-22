@@ -108,6 +108,7 @@ export class ClientsService {
       activeInternalSquads: [squadUuid],
       description: `reseller:${resellerId}${dto.note ? ` | ${dto.note}` : ''}`,
       telegramId: dto.clientTelegramId ? Number(dto.clientTelegramId) : undefined,
+      hwidDeviceLimit: dto.hwidDeviceLimit ?? 1,
     });
 
     let client;
@@ -266,6 +267,24 @@ export class ClientsService {
       });
     }
     return { subscriptionUrl: remna.subscriptionUrl ?? c.subscriptionUrl ?? null };
+  }
+
+  async listDevices(resellerId: string, id: string) {
+    const c = await this.ownClient(resellerId, id);
+    return this.remna.listUserHwidDevices(c.remnawaveUuid);
+  }
+
+  async deleteDevice(resellerId: string, id: string, hwid: string) {
+    const c = await this.ownClient(resellerId, id);
+    const result = await this.remna.deleteUserHwidDevice(c.remnawaveUuid, hwid);
+    await this.audit.log({
+      actor: `reseller:${resellerId}`,
+      resellerId,
+      action: 'client.device.delete',
+      targetId: id,
+      payload: { hwid },
+    });
+    return result;
   }
 
   async usage(resellerId: string, id: string, from?: string, to?: string) {

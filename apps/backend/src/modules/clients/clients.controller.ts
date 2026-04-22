@@ -91,4 +91,18 @@ export class ClientsController {
   ) {
     return this.svc.usage(user.sub, id, from, to);
   }
+
+  @Get(':id/devices')
+  devices(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.listDevices(user.sub, id);
+  }
+
+  @Delete(':id/devices/:hwid')
+  removeDevice(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('hwid') hwid: string,
+  ) {
+    return this.svc.deleteDevice(user.sub, id, hwid);
+  }
 }

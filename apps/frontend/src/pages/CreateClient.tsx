@@ -18,6 +18,7 @@ export function CreateClient() {
   const [unlimited, setUnlimited] = useState(true);
   const [trafficGb, setTrafficGb] = useState<string>('100');
   const [note, setNote] = useState('');
+  const [deviceLimit, setDeviceLimit] = useState<string>('1');
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -25,6 +26,8 @@ export function CreateClient() {
       const body: Record<string, unknown> = { username, durationDays };
       if (!unlimited) body.trafficLimitGb = Number(trafficGb);
       if (note) body.note = note;
+      const parsedLimit = Number(deviceLimit);
+      if (Number.isFinite(parsedLimit) && parsedLimit >= 0) body.hwidDeviceLimit = parsedLimit;
       const { data } = await api.post('/clients', body);
       return data;
     },
@@ -113,6 +116,16 @@ export function CreateClient() {
           />
         )}
       </Card>
+
+      <Input
+        label="Лимит устройств (HWID)"
+        type="number"
+        min={0}
+        max={100}
+        value={deviceLimit}
+        onChange={(e) => setDeviceLimit(e.target.value)}
+        placeholder="1 = одно устройство, 0 = безлимит"
+      />
 
       <Input
         label="Заметка"

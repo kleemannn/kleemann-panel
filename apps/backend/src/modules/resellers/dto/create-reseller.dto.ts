@@ -26,4 +26,13 @@ export class CreateResellerDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Optional short tag used by Remnawave to attribute remote users to
+  // this reseller. Uppercase letters, digits and underscore, max 16.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9_]{1,16}$/, {
+    message: 'tag must be 1-16 chars of A-Z, 0-9 or underscore',
+  })
+  tag?: string;
 }

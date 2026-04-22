@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/Button';
+import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 interface AdminSummary {
   resellers: number;
@@ -11,12 +12,36 @@ interface AdminSummary {
   activeClients: number;
 }
 
+interface ImportResult {
+  imported: number;
+  skippedNoTag: number;
+  skippedExisting: number;
+  skippedUnknownTag: number;
+}
+
 export function AdminDashboard() {
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ['admin', 'summary'],
     queryFn: async () => (await api.get<AdminSummary>('/stats/admin/summary')).data,
   });
   const s = q.data;
+
+  const importMut = useMutation({
+    mutationFn: async () => (await api.post<ImportResult>('/admin/resellers/import-clients')).data,
+    onSuccess: (r) => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'summary'] });
+      const msg =
+        `Импортировано: ${r.imported}\n` +
+        `Уже было: ${r.skippedExisting}\n` +
+        `Без тега: ${r.skippedNoTag}\n` +
+        `Неизвестный тег: ${r.skippedUnknownTag}`;
+      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+    },
+    onError: () => tgHapticError(),
+  });
 
   return (
     <div className="p-4 space-y-4">
@@ -46,6 +71,14 @@ export function AdminDashboard() {
         <Link to="/admin/audit">
           <Button full variant="secondary">📋 Audit</Button>
         </Link>
+        <Button
+          full
+          variant="secondary"
+          onClick={() => importMut.mutate()}
+          disabled={importMut.isPending}
+        >
+          {importMut.isPending ? '⏳ Импортируем…' : '⬇ Импорт из Remnawave'}
+        </Button>
       </div>
     </div>
   );

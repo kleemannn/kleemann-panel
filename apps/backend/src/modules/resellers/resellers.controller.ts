@@ -51,4 +51,9 @@ export class ResellersController {
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.svc.remove(user.sub, id);
   }
+
+  @Post('import-clients')
+  importClients(@CurrentUser() user: JwtUser) {
+    return this.svc.importFromRemnawave(user.sub);
+  }
 }

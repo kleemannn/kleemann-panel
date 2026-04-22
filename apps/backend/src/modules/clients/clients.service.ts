@@ -109,6 +109,7 @@ export class ClientsService {
       description: `reseller:${resellerId}${dto.note ? ` | ${dto.note}` : ''}`,
       telegramId: dto.clientTelegramId ? Number(dto.clientTelegramId) : undefined,
       hwidDeviceLimit: dto.hwidDeviceLimit ?? 1,
+      tag: reseller.tag ?? undefined,
     });
 
     let client;

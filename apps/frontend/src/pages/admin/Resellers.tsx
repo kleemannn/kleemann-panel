@@ -12,6 +12,7 @@ interface Reseller {
   telegramId: string;
   username?: string | null;
   firstName?: string | null;
+  tag?: string | null;
   type: 'STANDARD' | 'PREMIUM';
   maxClients: number;
   clientsCount: number;
@@ -49,8 +50,15 @@ export function Resellers() {
               <Card className="text-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium">
-                      {r.username ? `@${r.username}` : r.firstName ?? `tg:${r.telegramId}`}
+                    <div className="font-medium flex items-center gap-2">
+                      <span>
+                        {r.username ? `@${r.username}` : r.firstName ?? `tg:${r.telegramId}`}
+                      </span>
+                      {r.tag && (
+                        <span className="text-[10px] font-mono rounded px-1.5 py-0.5 bg-tg-hint/15 text-tg-hint">
+                          {r.tag}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-tg-hint">
                       {r.type} · {r.clientsCount}/{r.maxClients} клиентов · до{' '}

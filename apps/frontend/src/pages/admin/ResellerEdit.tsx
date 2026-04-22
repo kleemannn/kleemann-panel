@@ -13,6 +13,7 @@ interface Reseller {
   telegramId: string;
   username?: string | null;
   firstName?: string | null;
+  tag?: string | null;
   type: 'STANDARD' | 'PREMIUM';
   maxClients: number;
   clientsCount: number;
@@ -34,6 +35,7 @@ export function ResellerEdit() {
   const [maxClients, setMaxClients] = useState('50');
   const [expiresAt, setExpiresAt] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [tag, setTag] = useState('');
 
   useEffect(() => {
     if (q.data) {
@@ -41,6 +43,7 @@ export function ResellerEdit() {
       setMaxClients(String(q.data.maxClients));
       setExpiresAt(q.data.expiresAt ? q.data.expiresAt.slice(0, 10) : '');
       setIsActive(q.data.isActive);
+      setTag(q.data.tag ?? '');
     }
   }, [q.data]);
 
@@ -51,6 +54,7 @@ export function ResellerEdit() {
         maxClients: Number(maxClients),
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         isActive,
+        tag: tag || '',
       });
     },
     onSuccess: () => {
@@ -94,6 +98,12 @@ export function ResellerEdit() {
         min={0}
         value={maxClients}
         onChange={(e) => setMaxClients(e.target.value)}
+      />
+      <Input
+        label="Tag (A-Z, 0-9, _ — макс 16, пусто = убрать)"
+        placeholder="KLEEMANN"
+        value={tag}
+        onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))}
       />
       <Input
         label="Дата окончания (пусто = бессрочно)"

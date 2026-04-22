@@ -12,6 +12,7 @@ export interface RemnaCreateUserInput {
   telegramId?: number;
   status?: 'ACTIVE' | 'DISABLED';
   hwidDeviceLimit?: number;
+  tag?: string;
 }
 
 export interface RemnaHwidDevice {
@@ -35,6 +36,10 @@ export interface RemnaUser {
   trafficLimitBytes?: number;
   usedTrafficBytes?: number;
   activeInternalSquads?: { uuid: string }[] | string[];
+  tag?: string | null;
+  description?: string | null;
+  telegramId?: number | null;
+  hwidDeviceLimit?: number | null;
   [k: string]: unknown;
 }
 

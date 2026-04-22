@@ -31,6 +31,10 @@ model Reseller {
   username    String?
   firstName   String?
   lastName    String?
+  // Uppercase alphanumeric tag (max 16 chars) propagated to Remnawave
+  // on every client this reseller creates, so admins can attribute
+  // remote users back to a reseller. Unique across all resellers.
+  tag         String?      @unique
   role        Role         @default(RESELLER)
   type        ResellerType @default(STANDARD)
   maxClients  Int          @default(50)

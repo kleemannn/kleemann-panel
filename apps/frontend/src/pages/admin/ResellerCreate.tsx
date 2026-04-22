@@ -12,6 +12,7 @@ export function ResellerCreate() {
   const qc = useQueryClient();
   const [telegramId, setTelegramId] = useState('');
   const [username, setUsername] = useState('');
+  const [tag, setTag] = useState('');
   const [type, setType] = useState<'STANDARD' | 'PREMIUM'>('STANDARD');
   const [maxClients, setMaxClients] = useState('50');
   const [expiresAt, setExpiresAt] = useState<string>('');
@@ -24,6 +25,7 @@ export function ResellerCreate() {
         maxClients: Number(maxClients),
       };
       if (username) body.username = username;
+      if (tag) body.tag = tag;
       if (expiresAt) body.expiresAt = new Date(expiresAt).toISOString();
       const { data } = await api.post('/admin/resellers', body);
       return data;
@@ -61,6 +63,12 @@ export function ResellerCreate() {
         placeholder="@ignore, только для отображения"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
+      />
+      <Input
+        label="Tag (A-Z, 0-9, _ — макс 16)"
+        placeholder="KLEEMANN"
+        value={tag}
+        onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))}
       />
       <Select label="Тип" value={type} onChange={(e) => setType(e.target.value as 'STANDARD' | 'PREMIUM')}>
         <option value="STANDARD">STANDARD</option>

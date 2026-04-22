@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { ResellerType } from '@prisma/client';
 
 export class UpdateResellerDto {
@@ -19,4 +19,12 @@ export class UpdateResellerDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Pass "" or null to clear the tag.
+  @IsOptional()
+  @IsString()
+  @Matches(/^([A-Z0-9_]{1,16})?$/, {
+    message: 'tag must be 1-16 chars of A-Z, 0-9 or underscore (or empty to clear)',
+  })
+  tag?: string | null;
 }

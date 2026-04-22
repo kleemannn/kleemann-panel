@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+coverage
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.idea
+.vscode
+.pnpm-store
+apps/backend/dist
+apps/frontend/dist
+apps/backend/prisma/*.db
+apps/backend/prisma/*.db-journal

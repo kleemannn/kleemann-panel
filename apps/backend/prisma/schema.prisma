@@ -1,0 +1,93 @@
+// Prisma schema for Kleemann Panel
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RESELLER
+}
+
+enum ResellerType {
+  STANDARD
+  PREMIUM
+}
+
+enum ClientStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+  LIMITED
+}
+
+model Reseller {
+  id          String       @id @default(uuid())
+  telegramId  BigInt       @unique
+  username    String?
+  firstName   String?
+  lastName    String?
+  role        Role         @default(RESELLER)
+  type        ResellerType @default(STANDARD)
+  maxClients  Int          @default(50)
+  expiresAt   DateTime?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  clients     Client[]
+  auditLogs   AuditLog[]
+
+  @@index([role])
+  @@index([type])
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  resellerId     String
+  reseller       Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  remnawaveUuid  String       @unique
+  username       String       @unique
+  telegramId     BigInt?
+  note           String?
+  subscriptionUrl String?
+  shortUuid      String?
+  expiresAt      DateTime?
+  trafficLimitGb Int?                         // null = unlimited
+  squadUuid      String
+  status         ClientStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([resellerId])
+  @@index([status])
+}
+
+// Mapping reseller type -> Remnawave internal squad UUID.
+// Can be overridden via admin UI; falls back to env SQUAD_*_UUID.
+model SquadMapping {
+  id        String       @id @default(uuid())
+  type      ResellerType @unique
+  squadUuid String
+  label     String?
+  updatedAt DateTime     @updatedAt
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  actor      String                          // "admin:<id>" | "reseller:<id>"
+  action     String                          // "client.create", "reseller.create", ...
+  targetId   String?
+  payload    Json?
+  ip         String?
+  createdAt  DateTime  @default(now())
+
+  @@index([resellerId, createdAt])
+  @@index([action])
+}

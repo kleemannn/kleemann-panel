@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kleemann
+      POSTGRES_PASSWORD: kleemann
+      POSTGRES_DB: kleemann
+    ports:
+      - "5432:5432"
+    volumes:
+      - kleemann_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kleemann -d kleemann"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://kleemann:kleemann@postgres:5432/kleemann?schema=public
+    ports:
+      - "4000:4000"
+    command: sh -c "pnpm exec prisma migrate deploy && node dist/main.js"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api/v1}
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  kleemann_pg:

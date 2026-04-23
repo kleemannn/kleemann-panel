@@ -5,20 +5,21 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DurationPicker, DurationState, resolveDuration } from '@/components/DurationPicker';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
-
-const PRESETS = [7, 30];
-
-type Mode = 'preset' | 'custom' | 'date';
 
 export function CreateClient() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [username, setUsername] = useState('');
-  const [duration, setDuration] = useState(30);
-  const [customDuration, setCustomDuration] = useState<string>('');
-  const [untilDate, setUntilDate] = useState<string>('');
-  const [mode, setMode] = useState<Mode>('preset');
+  const [duration, setDuration] = useState<DurationState>({
+    mode: 'preset',
+    preset: 30,
+    custom: '',
+    date: '',
+  });
   const [unlimited, setUnlimited] = useState(true);
   const [trafficGb, setTrafficGb] = useState<string>('100');
   const [note, setNote] = useState('');
@@ -27,16 +28,11 @@ export function CreateClient() {
   const mut = useMutation({
     mutationFn: async () => {
       const body: Record<string, unknown> = { username };
-      if (mode === 'date') {
-        if (!untilDate) throw new Error('Выбери дату');
-        body.expiresAt = new Date(`${untilDate}T23:59:59`).toISOString();
-      } else {
-        const durationDays = mode === 'custom' ? Number(customDuration) : duration;
-        if (!Number.isFinite(durationDays) || durationDays <= 0) {
-          throw new Error('Введи корректное число дней');
-        }
-        body.durationDays = durationDays;
-      }
+      const { durationDays, expiresAt } = resolveDuration(duration);
+      if (expiresAt) body.expiresAt = expiresAt;
+      else if (durationDays) body.durationDays = durationDays;
+      else throw new Error('Укажи срок подписки');
+
       if (!unlimited) body.trafficLimitGb = Number(trafficGb);
       if (note) body.note = note;
       const parsedLimit = Number(deviceLimit);
@@ -55,11 +51,13 @@ export function CreateClient() {
     onError: () => tgHapticError(),
   });
 
-  const err = mut.error as any;
+  const err = mut.error as
+    | { response?: { data?: { message?: string | string[] } }; message?: string }
+    | null;
   const errMsg =
-    err?.response?.data?.message ??
-    (Array.isArray(err?.response?.data?.message) ? err.response.data.message.join(', ') : null) ??
-    err?.message;
+    (Array.isArray(err?.response?.data?.message)
+      ? err?.response?.data?.message.join(', ')
+      : err?.response?.data?.message) ?? err?.message;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -68,8 +66,8 @@ export function CreateClient() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Новый клиент</h1>
+    <form onSubmit={onSubmit} className="space-y-5 p-4">
+      <PageHeader title="Новый клиент" subtitle="Создание подписки" back />
 
       <Input
         label="Username"
@@ -81,64 +79,30 @@ export function CreateClient() {
         required
       />
 
-      <div>
-        <span className="block text-sm font-medium mb-2">Срок подписки</span>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          {PRESETS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => {
-                setMode('preset');
-                setDuration(d);
-                setCustomDuration('');
-                setUntilDate('');
-              }}
-              className={`shrink-0 rounded-full px-3 py-2 text-sm ${
-                mode === 'preset' && duration === d
-                  ? 'bg-tg-button text-tg-buttonText'
-                  : 'bg-tg-secondary'
-              }`}
-            >
-              {d} дн.
-            </button>
-          ))}
-          <Input
-            className="!h-10 w-24 shrink-0"
-            placeholder="другое"
-            type="number"
-            min={1}
-            value={customDuration}
-            onChange={(e) => {
-              setCustomDuration(e.target.value);
-              setMode(e.target.value ? 'custom' : 'preset');
-              if (e.target.value) setUntilDate('');
-            }}
-          />
-        </div>
-        <div className="mt-2">
-          <Input
-            label="или до даты"
-            type="date"
-            min={new Date().toISOString().slice(0, 10)}
-            value={untilDate}
-            onChange={(e) => {
-              setUntilDate(e.target.value);
-              setMode(e.target.value ? 'date' : 'preset');
-              if (e.target.value) setCustomDuration('');
-            }}
-          />
-        </div>
-      </div>
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-tg-hint">
+          Срок подписки
+        </h2>
+        <DurationPicker state={duration} onChange={setDuration} />
+      </section>
 
       <Card className="space-y-3">
-        <label className="flex items-center gap-3">
+        <label className="flex cursor-pointer items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-tg-button/10 text-tg-button">
+              <Icon name="spark" size={16} />
+            </span>
+            <div>
+              <div className="text-sm font-medium">Безлимитный трафик</div>
+              <div className="text-xs text-tg-hint">Без ограничения по ГБ</div>
+            </div>
+          </div>
           <input
             type="checkbox"
             checked={unlimited}
             onChange={(e) => setUnlimited(e.target.checked)}
+            className="h-5 w-5 accent-tg-button"
           />
-          <span className="text-sm">Безлимитный трафик</span>
         </label>
         {!unlimited && (
           <Input
@@ -158,7 +122,7 @@ export function CreateClient() {
         max={100}
         value={deviceLimit}
         onChange={(e) => setDeviceLimit(e.target.value)}
-        placeholder="1 = одно устройство, 0 = безлимит"
+        hint="1 = одно устройство, 0 = безлимит"
       />
 
       <Input
@@ -168,10 +132,14 @@ export function CreateClient() {
         onChange={(e) => setNote(e.target.value)}
       />
 
-      {errMsg && <p className="text-sm text-red-500">{String(errMsg)}</p>}
+      {errMsg && (
+        <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-600">
+          {String(errMsg)}
+        </p>
+      )}
 
-      <Button type="submit" full disabled={mut.isPending || !username}>
-        {mut.isPending ? 'Создаём…' : 'Создать'}
+      <Button type="submit" full size="lg" disabled={mut.isPending || !username}>
+        <Icon name="plus" /> {mut.isPending ? 'Создаём…' : 'Создать клиента'}
       </Button>
     </form>
   );

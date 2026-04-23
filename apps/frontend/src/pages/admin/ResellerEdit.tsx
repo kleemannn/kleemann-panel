@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 interface Reseller {
@@ -77,58 +79,100 @@ export function ResellerEdit() {
     onError: () => tgHapticError(),
   });
 
-  if (q.isLoading || !q.data) return <div className="p-4 text-tg-hint text-sm">Загрузка…</div>;
+  if (q.isLoading || !q.data) {
+    return <div className="p-4 text-sm text-tg-hint">Загрузка…</div>;
+  }
+
+  const name = q.data.username ? `@${q.data.username}` : `tg:${q.data.telegramId}`;
+  const pct =
+    q.data.maxClients > 0
+      ? Math.min(100, Math.round((q.data.clientsCount / q.data.maxClients) * 100))
+      : 0;
 
   return (
-    <div className="p-4 space-y-3">
-      <h1 className="text-xl font-semibold">
-        {q.data.username ? `@${q.data.username}` : `tg:${q.data.telegramId}`}
-      </h1>
-      <Card className="text-sm text-tg-hint">
-        Клиентов: {q.data.clientsCount} / {q.data.maxClients}
+    <div className="space-y-4 p-4">
+      <PageHeader title={name} subtitle={q.data.firstName ?? undefined} back />
+
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-tg-hint">
+            Клиенты
+          </span>
+          <span className="text-xs font-medium tabular-nums">
+            {q.data.clientsCount} / {q.data.maxClients}
+          </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
+          <div
+            className={`h-full rounded-full ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-tg-button'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </Card>
 
-      <Select label="Тип" value={type} onChange={(e) => setType(e.target.value as any)}>
+      <Select
+        label="Тип"
+        value={type}
+        onChange={(e) => setType(e.target.value as 'STANDARD' | 'PREMIUM')}
+      >
         <option value="STANDARD">STANDARD</option>
         <option value="PREMIUM">PREMIUM</option>
       </Select>
       <Input
-        label="Макс. клиентов"
+        label="Максимум клиентов"
         type="number"
         min={0}
         value={maxClients}
         onChange={(e) => setMaxClients(e.target.value)}
       />
       <Input
-        label="Tag (A-Z, 0-9, _ — макс 16, пусто = убрать)"
+        label="Tag"
         placeholder="KLEEMANN"
+        hint="A-Z, 0-9, _ — до 16 символов, пусто = убрать"
         value={tag}
-        onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))}
+        onChange={(e) =>
+          setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))
+        }
       />
       <Input
-        label="Дата окончания (пусто = бессрочно)"
+        label="Действует до"
+        hint="Пусто = бессрочно"
         type="date"
         value={expiresAt}
         onChange={(e) => setExpiresAt(e.target.value)}
       />
-      <label className="flex items-center gap-2">
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-        <span className="text-sm">Активен</span>
-      </label>
 
-      <Button full onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-        {saveMut.isPending ? 'Сохраняем…' : 'Сохранить'}
+      <Card className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium">Активен</div>
+          <div className="text-xs text-tg-hint">
+            При выключении новые клиенты создаваться не будут
+          </div>
+        </div>
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-5 w-5 accent-tg-button"
+        />
+      </Card>
+
+      <Button full size="lg" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+        <Icon name="check" /> {saveMut.isPending ? 'Сохраняем…' : 'Сохранить'}
       </Button>
 
       <Button
         full
         variant="danger"
+        size="lg"
         onClick={() =>
-          window.Telegram?.WebApp?.showConfirm?.('Удалить реселлера?', (ok) => ok && delMut.mutate()) ??
-          (confirm('Удалить реселлера?') && delMut.mutate())
+          window.Telegram?.WebApp?.showConfirm?.(
+            'Удалить реселлера?',
+            (ok) => ok && delMut.mutate(),
+          ) ?? (window.confirm('Удалить реселлера?') && delMut.mutate())
         }
       >
-        Удалить реселлера
+        <Icon name="trash" /> Удалить реселлера
       </Button>
     </div>
   );

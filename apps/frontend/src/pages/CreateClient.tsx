@@ -8,11 +8,13 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DurationPicker, DurationState, resolveDuration } from '@/components/DurationPicker';
+import { useAuthStore } from '@/store/auth';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 export function CreateClient() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const isAdmin = useAuthStore((s) => s.me?.role) === 'ADMIN';
   const [username, setUsername] = useState('');
   const [duration, setDuration] = useState<DurationState>({
     mode: 'preset',
@@ -35,9 +37,11 @@ export function CreateClient() {
 
       if (!unlimited) body.trafficLimitGb = Number(trafficGb);
       if (note) body.note = note;
-      const parsedLimit = Number(deviceLimit);
-      if (deviceLimit.trim() !== '' && Number.isFinite(parsedLimit) && parsedLimit >= 0) {
-        body.hwidDeviceLimit = parsedLimit;
+      if (isAdmin) {
+        const parsedLimit = Number(deviceLimit);
+        if (deviceLimit.trim() !== '' && Number.isFinite(parsedLimit) && parsedLimit >= 0) {
+          body.hwidDeviceLimit = parsedLimit;
+        }
       }
       const { data } = await api.post('/clients', body);
       return data;
@@ -115,15 +119,17 @@ export function CreateClient() {
         )}
       </Card>
 
-      <Input
-        label="Лимит устройств (HWID)"
-        type="number"
-        min={0}
-        max={100}
-        value={deviceLimit}
-        onChange={(e) => setDeviceLimit(e.target.value)}
-        hint="1 = одно устройство, 0 = безлимит"
-      />
+      {isAdmin && (
+        <Input
+          label="Лимит устройств (HWID)"
+          type="number"
+          min={0}
+          max={100}
+          value={deviceLimit}
+          onChange={(e) => setDeviceLimit(e.target.value)}
+          hint="1 = одно устройство, 0 = безлимит"
+        />
+      )}
 
       <Input
         label="Заметка"

@@ -16,10 +16,13 @@ export function DurationPicker({
   state,
   onChange,
   presetPrefix = '',
+  baseDate,
 }: {
   state: DurationState;
   onChange: (next: DurationState) => void;
   presetPrefix?: string;
+  /** Date from which "+N days" is computed for the calendar mode. Defaults to "now". */
+  baseDate?: Date;
 }) {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -41,6 +44,14 @@ export function DurationPicker({
       custom: '',
       date: v,
     });
+
+  const addedFromDate = (() => {
+    if (state.mode !== 'date' || !state.date) return null;
+    const picked = new Date(`${state.date}T23:59:59`);
+    const base = baseDate ?? new Date();
+    const days = Math.max(0, Math.round((picked.getTime() - base.getTime()) / 864e5));
+    return days;
+  })();
 
   return (
     <div className="space-y-3">
@@ -81,22 +92,51 @@ export function DurationPicker({
         </div>
       </div>
 
-      <div className="relative">
-        <Icon
-          name="calendar"
-          size={18}
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tg-hint"
-        />
-        <input
-          type="date"
-          min={today}
-          value={state.date}
-          onChange={(e) => setDate(e.target.value)}
-          className={clsx(
-            'h-11 w-full rounded-xl bg-tg-secondary pl-10 pr-3.5 text-sm outline-none transition ring-1',
-            state.mode === 'date' ? 'ring-tg-button' : 'ring-black/5 focus:ring-tg-button/60',
+      <div
+        className={clsx(
+          'rounded-2xl bg-tg-secondary p-3 ring-1 transition',
+          state.mode === 'date' ? 'ring-tg-button' : 'ring-black/5',
+        )}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span
+              className={clsx(
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition',
+                state.mode === 'date'
+                  ? 'bg-tg-button/15 text-tg-button'
+                  : 'bg-black/[0.04] text-tg-hint',
+              )}
+            >
+              <Icon name="calendar" size={20} />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-tg-hint">или до даты</div>
+              <input
+                type="date"
+                min={today}
+                value={state.date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-0.5 block w-full bg-transparent text-base font-medium tabular-nums outline-none"
+              />
+            </div>
+          </label>
+          {addedFromDate !== null && addedFromDate > 0 && (
+            <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">
+              +{addedFromDate} дн.
+            </span>
           )}
-        />
+          {state.mode === 'date' && state.date && (
+            <button
+              type="button"
+              onClick={() => setDate('')}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tg-hint hover:bg-black/5"
+              aria-label="Очистить"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

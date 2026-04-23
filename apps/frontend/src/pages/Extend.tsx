@@ -31,13 +31,18 @@ export function Extend() {
   const [date, setDate] = useState('');
   const [mode, setMode] = useState<Mode>('preset');
 
-  const previewExpireAt = useMemo(() => {
+  const preview = useMemo(() => {
     const current = client.data?.expiresAt ? new Date(client.data.expiresAt) : null;
     const base = current && current > new Date() ? current : new Date();
-    if (mode === 'date') return date ? new Date(`${date}T23:59:59`) : null;
+    if (mode === 'date') {
+      if (!date) return { newExpireAt: null, addedDays: null };
+      const newExpireAt = new Date(`${date}T23:59:59`);
+      const addedDays = Math.max(0, Math.round((newExpireAt.getTime() - base.getTime()) / 864e5));
+      return { newExpireAt, addedDays };
+    }
     const delta = mode === 'custom' ? Number(custom) : days;
-    if (!Number.isFinite(delta) || delta <= 0) return null;
-    return addDays(base, delta);
+    if (!Number.isFinite(delta) || delta <= 0) return { newExpireAt: null, addedDays: null };
+    return { newExpireAt: addDays(base, delta), addedDays: delta };
   }, [mode, days, custom, date, client.data?.expiresAt]);
 
   const mut = useMutation({
@@ -69,7 +74,7 @@ export function Extend() {
       : err?.response?.data?.message) ?? err?.message;
 
   const today = new Date().toISOString().slice(0, 10);
-  const disabled = mut.isPending || previewExpireAt === null;
+  const disabled = mut.isPending || preview.newExpireAt === null;
 
   return (
     <div className="p-4 space-y-4">
@@ -88,6 +93,7 @@ export function Extend() {
               setMode('preset');
               setDays(d);
               setCustom('');
+              setDate('');
             }}
             className={`shrink-0 rounded-full px-3 py-2 text-sm ${
               mode === 'preset' && days === d ? 'bg-tg-button text-tg-buttonText' : 'bg-tg-secondary'
@@ -105,6 +111,7 @@ export function Extend() {
           onChange={(e) => {
             setCustom(e.target.value);
             setMode(e.target.value ? 'custom' : 'preset');
+            if (e.target.value) setDate('');
           }}
         />
       </div>
@@ -118,13 +125,17 @@ export function Extend() {
           onChange={(e) => {
             setDate(e.target.value);
             setMode(e.target.value ? 'date' : 'preset');
+            if (e.target.value) setCustom('');
           }}
         />
       </div>
 
-      {previewExpireAt && (
+      {preview.newExpireAt && (
         <p className="text-sm text-tg-hint">
-          Новый срок: <span className="text-tg-text">{formatDate(previewExpireAt)}</span>
+          Новый срок: <span className="text-tg-text">{formatDate(preview.newExpireAt)}</span>
+          {preview.addedDays !== null && (
+            <span className="text-tg-text"> (+{preview.addedDays} дн.)</span>
+          )}
         </p>
       )}
 
@@ -134,7 +145,7 @@ export function Extend() {
         {mut.isPending
           ? 'Продлеваем…'
           : mode === 'date'
-            ? `Продлить до ${date || '…'}`
+            ? `Продлить до ${date || '…'}${preview.addedDays !== null ? ` (+${preview.addedDays} дн.)` : ''}`
             : `Продлить на ${mode === 'custom' ? custom || '…' : days} дн.`}
       </Button>
     </div>

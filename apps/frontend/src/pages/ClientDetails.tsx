@@ -133,9 +133,14 @@ export function ClientDetails() {
     }
   };
 
-  const confirm_ = (msg: string, cb: () => void) =>
-    window.Telegram?.WebApp?.showConfirm?.(msg, (ok) => ok && cb()) ??
-    (window.confirm(msg) && cb());
+  const confirm_ = (msg: string, cb: () => void) => {
+    const webApp = window.Telegram?.WebApp;
+    if (webApp?.showConfirm) {
+      webApp.showConfirm(msg, (ok) => ok && cb());
+    } else if (window.confirm(msg)) {
+      cb();
+    }
+  };
 
   return (
     <div className="space-y-5 p-4">

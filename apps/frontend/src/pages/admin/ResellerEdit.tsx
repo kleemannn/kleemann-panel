@@ -165,12 +165,14 @@ export function ResellerEdit() {
         full
         variant="danger"
         size="lg"
-        onClick={() =>
-          window.Telegram?.WebApp?.showConfirm?.(
-            'Удалить реселлера?',
-            (ok) => ok && delMut.mutate(),
-          ) ?? (window.confirm('Удалить реселлера?') && delMut.mutate())
-        }
+        onClick={() => {
+          const webApp = window.Telegram?.WebApp;
+          if (webApp?.showConfirm) {
+            webApp.showConfirm('Удалить реселлера?', (ok) => ok && delMut.mutate());
+          } else if (window.confirm('Удалить реселлера?')) {
+            delMut.mutate();
+          }
+        }}
       >
         <Icon name="trash" /> Удалить реселлера
       </Button>

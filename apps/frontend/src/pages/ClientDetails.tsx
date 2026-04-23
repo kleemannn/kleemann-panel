@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { formatDate, formatGb, daysUntil } from '@/lib/format';
+import { formatDate, formatDateTime, formatGb, daysUntil } from '@/lib/format';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 interface Client {
@@ -39,7 +39,15 @@ export function ClientDetails() {
   const sub = useQuery({
     queryKey: ['client', id, 'subscription'],
     queryFn: async () =>
-      (await api.get<{ subscriptionUrl: string | null }>(`/clients/${id}/subscription`)).data,
+      (
+        await api.get<{
+          subscriptionUrl: string | null;
+          happCryptoLink: string | null;
+          onlineAt: string | null;
+          firstConnectedAt: string | null;
+          lastTrafficResetAt: string | null;
+        }>(`/clients/${id}/subscription`)
+      ).data,
     enabled: !!q.data,
   });
 
@@ -95,14 +103,13 @@ export function ClientDetails() {
 
   const d = daysUntil(c.expiresAt ?? null);
 
-  const copy = async () => {
-    if (!sub.data?.subscriptionUrl) return;
+  const copyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(sub.data.subscriptionUrl);
+      await navigator.clipboard.writeText(text);
       tgHapticSuccess();
-      window.Telegram?.WebApp?.showAlert?.('Ссылка скопирована');
+      window.Telegram?.WebApp?.showAlert?.('Скопировано');
     } catch {
-      window.Telegram?.WebApp?.openLink?.(sub.data.subscriptionUrl);
+      window.Telegram?.WebApp?.openLink?.(text);
     }
   };
 
@@ -119,13 +126,40 @@ export function ClientDetails() {
       <Card className="space-y-1 text-sm">
         <Row k="Трафик" v={formatGb(c.trafficLimitGb ?? null)} />
         <Row k="Заметка" v={c.note || '—'} />
-        <Row k="Subscription" v={
-          sub.data?.subscriptionUrl ? (
-            <button className="text-tg-link break-all text-left" onClick={copy}>
-              {sub.data.subscriptionUrl}
-            </button>
-          ) : '—'
-        } />
+        <Row
+          k="Последний раз в сети"
+          v={sub.data?.onlineAt ? formatDateTime(sub.data.onlineAt) : '—'}
+        />
+        <Row
+          k="Subscription"
+          v={
+            sub.data?.subscriptionUrl ? (
+              <button
+                className="text-tg-link break-all text-left"
+                onClick={() => copyText(sub.data!.subscriptionUrl!)}
+              >
+                {sub.data.subscriptionUrl}
+              </button>
+            ) : (
+              '—'
+            )
+          }
+        />
+        <Row
+          k="Happ Crypto Link"
+          v={
+            sub.data?.happCryptoLink ? (
+              <button
+                className="text-tg-link break-all text-left font-mono text-xs"
+                onClick={() => copyText(sub.data!.happCryptoLink!)}
+              >
+                {sub.data.happCryptoLink}
+              </button>
+            ) : (
+              '—'
+            )
+          }
+        />
       </Card>
 
       <section className="space-y-2">

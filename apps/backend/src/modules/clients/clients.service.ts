@@ -262,15 +262,35 @@ export class ClientsService {
 
   async subscription(resellerId: string, id: string) {
     const c = await this.ownClient(resellerId, id);
-    // Re-fetch from panel to always return a fresh subscriptionUrl
+    // Re-fetch from panel to always return fresh data (url + online/traffic stats)
     const remna = await this.remna.getUserByUuid(c.remnawaveUuid);
+    const subscriptionUrl = remna.subscriptionUrl ?? c.subscriptionUrl ?? null;
     if (remna.subscriptionUrl && remna.subscriptionUrl !== c.subscriptionUrl) {
       await this.prisma.client.update({
         where: { id },
         data: { subscriptionUrl: remna.subscriptionUrl },
       });
     }
-    return { subscriptionUrl: remna.subscriptionUrl ?? c.subscriptionUrl ?? null };
+
+    // Encrypting the subscription URL is best-effort: if the panel is on an
+    // older version or the system endpoint is unreachable, just omit the
+    // link instead of failing the whole request.
+    let happCryptoLink: string | null = null;
+    if (subscriptionUrl) {
+      try {
+        happCryptoLink = `happ://crypt4/${await this.remna.encryptHappCryptoLink(subscriptionUrl)}`;
+      } catch {
+        happCryptoLink = null;
+      }
+    }
+
+    return {
+      subscriptionUrl,
+      happCryptoLink,
+      onlineAt: remna.onlineAt ?? null,
+      firstConnectedAt: remna.firstConnectedAt ?? null,
+      lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
+    };
   }
 
   async listDevices(resellerId: string, id: string) {

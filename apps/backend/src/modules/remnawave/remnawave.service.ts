@@ -40,6 +40,9 @@ export interface RemnaUser {
   description?: string | null;
   telegramId?: number | null;
   hwidDeviceLimit?: number | null;
+  onlineAt?: string | null;
+  firstConnectedAt?: string | null;
+  lastTrafficResetAt?: string | null;
   [k: string]: unknown;
 }
 
@@ -125,6 +128,13 @@ export class RemnawaveService {
   async userUsage(uuid: string, start: string, end: string): Promise<unknown> {
     const { data } = await this.http.get(`/api/users/${uuid}/usage`, { params: { start, end } });
     return data.response ?? data;
+  }
+
+  // ---- System tools ----
+  async encryptHappCryptoLink(linkToEncrypt: string): Promise<string> {
+    const { data } = await this.http.post('/api/system/tools/happ/encrypt', { linkToEncrypt });
+    const r = data.response ?? data;
+    return r.encryptedLink as string;
   }
 
   // ---- HWID devices ----

@@ -27,4 +27,9 @@ export class UpdateResellerDto {
     message: 'tag must be 1-16 chars of A-Z, 0-9 or underscore (or empty to clear)',
   })
   tag?: string | null;
+
+  // Pass "" or null to clear.
+  @IsOptional()
+  @IsString()
+  providerId?: string | null;
 }

@@ -35,6 +35,9 @@ model Reseller {
   // on every client this reseller creates, so admins can attribute
   // remote users back to a reseller. Unique across all resellers.
   tag         String?      @unique
+  // Free-form provider identifier assigned by admin (e.g. external billing/partner id).
+  // Not enforced unique; purely informational, shown in admin UI.
+  providerId  String?
   role        Role         @default(RESELLER)
   type        ResellerType @default(STANDARD)
   maxClients  Int          @default(50)

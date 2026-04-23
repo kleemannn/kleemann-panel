@@ -77,6 +77,7 @@ export class ResellersService {
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
         isActive: dto.isActive ?? true,
         tag: dto.tag ?? null,
+        providerId: dto.providerId?.trim() || null,
         role: Role.RESELLER,
       },
     });
@@ -117,6 +118,10 @@ export class ResellersService {
         }
       }
       data.tag = normalized;
+    }
+    if (dto.providerId !== undefined) {
+      const normalized = dto.providerId === null ? null : dto.providerId.trim();
+      data.providerId = normalized ? normalized : null;
     }
 
     const updated = await this.prisma.reseller.update({ where: { id }, data });

@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 export function ResellerCreate() {
@@ -39,8 +41,13 @@ export function ResellerCreate() {
     onError: () => tgHapticError(),
   });
 
-  const err = mut.error as any;
-  const errMsg = err?.response?.data?.message ?? err?.message;
+  const err = mut.error as
+    | { response?: { data?: { message?: string | string[] } }; message?: string }
+    | null;
+  const errMsg =
+    (Array.isArray(err?.response?.data?.message)
+      ? err?.response?.data?.message.join(', ')
+      : err?.response?.data?.message) ?? err?.message;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -49,8 +56,9 @@ export function ResellerCreate() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="p-4 space-y-3">
-      <h1 className="text-xl font-semibold">Новый реселлер</h1>
+    <form onSubmit={onSubmit} className="space-y-4 p-4">
+      <PageHeader title="Новый реселлер" back />
+
       <Input
         label="Telegram ID"
         placeholder="123456789"
@@ -59,37 +67,49 @@ export function ResellerCreate() {
         required
       />
       <Input
-        label="Username (необязательно)"
-        placeholder="@ignore, только для отображения"
+        label="Username"
+        placeholder="необязательно, для отображения"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
       />
       <Input
-        label="Tag (A-Z, 0-9, _ — макс 16)"
+        label="Tag"
         placeholder="KLEEMANN"
+        hint="A-Z, 0-9, _ — до 16 символов"
         value={tag}
-        onChange={(e) => setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))}
+        onChange={(e) =>
+          setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))
+        }
       />
-      <Select label="Тип" value={type} onChange={(e) => setType(e.target.value as 'STANDARD' | 'PREMIUM')}>
+      <Select
+        label="Тип"
+        value={type}
+        onChange={(e) => setType(e.target.value as 'STANDARD' | 'PREMIUM')}
+      >
         <option value="STANDARD">STANDARD</option>
         <option value="PREMIUM">PREMIUM</option>
       </Select>
       <Input
-        label="Макс. клиентов"
+        label="Максимум клиентов"
         type="number"
         min={0}
         value={maxClients}
         onChange={(e) => setMaxClients(e.target.value)}
       />
       <Input
-        label="Дата окончания аккаунта (необязательно)"
+        label="Действует до"
+        hint="Пусто = бессрочно"
         type="date"
         value={expiresAt}
         onChange={(e) => setExpiresAt(e.target.value)}
       />
-      {errMsg && <p className="text-sm text-red-500">{String(errMsg)}</p>}
-      <Button type="submit" full disabled={mut.isPending || !telegramId}>
-        {mut.isPending ? 'Создаём…' : 'Создать'}
+      {errMsg && (
+        <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-600">
+          {String(errMsg)}
+        </p>
+      )}
+      <Button type="submit" full size="lg" disabled={mut.isPending || !telegramId}>
+        <Icon name="plus" /> {mut.isPending ? 'Создаём…' : 'Создать реселлера'}
       </Button>
     </form>
   );

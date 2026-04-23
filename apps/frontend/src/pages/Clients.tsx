@@ -1,12 +1,23 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ClientRow, ClientRowModel } from '@/components/ClientRow';
 
 type Status = '' | 'ACTIVE' | 'EXPIRED' | 'DISABLED' | 'LIMITED';
+
+const STATUSES: { value: Status; label: string }[] = [
+  { value: '', label: 'Все' },
+  { value: 'ACTIVE', label: 'Активные' },
+  { value: 'EXPIRED', label: 'Истёкшие' },
+  { value: 'DISABLED', label: 'Отключённые' },
+];
 
 export function Clients() {
   const [search, setSearch] = useState('');
@@ -14,48 +25,76 @@ export function Clients() {
 
   const q = useQuery({
     queryKey: ['clients', { search, status }],
-    queryFn: async () => (await api.get<{ items: ClientRowModel[]; total: number }>('/clients', {
-      params: { search: search || undefined, status: status || undefined, take: 100 },
-    })).data,
+    queryFn: async () =>
+      (
+        await api.get<{ items: ClientRowModel[]; total: number }>('/clients', {
+          params: { search: search || undefined, status: status || undefined, take: 100 },
+        })
+      ).data,
   });
 
   return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Клиенты</h1>
-        <Link to="/clients/new">
-          <Button variant="secondary">➕ Новый</Button>
-        </Link>
-      </div>
-
-      <Input
-        placeholder="Поиск по username / заметке"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+    <div className="space-y-4 p-4">
+      <PageHeader
+        title="Клиенты"
+        subtitle={q.data ? `${q.data.total} всего` : undefined}
+        action={
+          <Link to="/clients/new">
+            <Button size="sm">
+              <Icon name="plus" size={16} /> Новый
+            </Button>
+          </Link>
+        }
       />
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {(['', 'ACTIVE', 'EXPIRED', 'DISABLED'] as Status[]).map((s) => (
+      <div className="relative">
+        <Icon
+          name="search"
+          size={18}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tg-hint"
+        />
+        <Input
+          placeholder="Поиск по username или заметке"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar">
+        {STATUSES.map((s) => (
           <button
-            key={s || 'all'}
-            onClick={() => setStatus(s)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${
-              status === s ? 'bg-tg-button text-tg-buttonText' : 'bg-tg-secondary text-tg-hint'
-            }`}
+            key={s.value || 'all'}
+            onClick={() => setStatus(s.value)}
+            className={clsx(
+              'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ring-1',
+              status === s.value
+                ? 'bg-tg-button text-tg-buttonText ring-tg-button'
+                : 'bg-tg-secondary text-tg-hint ring-black/5 hover:text-tg-text',
+            )}
           >
-            {s || 'Все'}
+            {s.label}
           </button>
         ))}
       </div>
 
       {q.isLoading ? (
-        <p className="text-tg-hint text-sm">Загрузка…</p>
+        <Card>
+          <p className="text-sm text-tg-hint">Загрузка…</p>
+        </Card>
       ) : q.data && q.data.items.length > 0 ? (
         <div className="space-y-2">
-          {q.data.items.map((c) => <ClientRow key={c.id} c={c} />)}
+          {q.data.items.map((c) => (
+            <ClientRow key={c.id} c={c} />
+          ))}
         </div>
       ) : (
-        <p className="text-tg-hint text-sm">Ничего не найдено.</p>
+        <Card className="flex flex-col items-center gap-2 py-8 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-hint/10 text-tg-hint">
+            <Icon name="users" />
+          </span>
+          <p className="text-sm text-tg-hint">Ничего не найдено</p>
+        </Card>
       )}
     </div>
   );

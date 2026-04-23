@@ -38,7 +38,7 @@ export function App() {
   const isAdmin = me.role === 'ADMIN';
 
   return (
-    <div className="min-h-full pb-20">
+    <div className="mx-auto min-h-full max-w-xl pb-24">
       <ScrollToTop />
       <Routes>
         {isAdmin ? (

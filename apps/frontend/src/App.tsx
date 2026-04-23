@@ -18,6 +18,7 @@ import { ResellerEdit } from '@/pages/admin/ResellerEdit';
 import { ResellerCreate } from '@/pages/admin/ResellerCreate';
 import { Squads } from '@/pages/admin/Squads';
 import { Audit } from '@/pages/admin/Audit';
+import { Backup } from '@/pages/admin/Backup';
 
 export function App() {
   const me = useAuthStore((s) => s.me);
@@ -49,6 +50,7 @@ export function App() {
             <Route path="/admin/resellers/:id" element={<ResellerEdit />} />
             <Route path="/admin/squads" element={<Squads />} />
             <Route path="/admin/audit" element={<Audit />} />
+            <Route path="/admin/backup" element={<Backup />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/new" element={<CreateClient />} />
             <Route path="/clients/:id" element={<ClientDetails />} />

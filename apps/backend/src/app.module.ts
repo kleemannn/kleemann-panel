@@ -8,6 +8,7 @@ import { ResellersModule } from './modules/resellers/resellers.module';
 import { SquadMappingModule } from './modules/squad-mapping/squad-mapping.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { BackupModule } from './modules/backup/backup.module';
 import { MeModule } from './modules/me/me.module';
 import { RemnawaveModule } from './modules/remnawave/remnawave.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     SquadMappingModule,
     StatsModule,
     AuditModule,
+    BackupModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

@@ -110,6 +110,12 @@ export function AdminDashboard() {
         <div className="grid grid-cols-2 gap-3">
           <ActionCard to="/admin/squads" icon="puzzle" title="Squads" subtitle="Маппинг squad'ов" />
           <ActionCard to="/admin/audit" icon="clipboard" title="Audit" subtitle="Журнал действий" />
+          <ActionCard
+            to="/admin/backup"
+            icon="download"
+            title="Backup"
+            subtitle="Экспорт и восстановление"
+          />
         </div>
       </section>
 

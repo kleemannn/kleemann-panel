@@ -112,7 +112,16 @@ export function Extend() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-tg-hint">
           Добавить
         </h2>
-        <DurationPicker state={duration} onChange={setDuration} presetPrefix="+" />
+        <DurationPicker
+          state={duration}
+          onChange={setDuration}
+          presetPrefix="+"
+          baseDate={
+            client.data?.expiresAt && new Date(client.data.expiresAt) > new Date()
+              ? new Date(client.data.expiresAt)
+              : undefined
+          }
+        />
       </section>
 
       {errMsg && (

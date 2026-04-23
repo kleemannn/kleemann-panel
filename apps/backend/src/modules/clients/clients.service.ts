@@ -388,12 +388,18 @@ export class ClientsService {
       const status = this.remoteErrorStatus(e);
       if (status === 404) {
         await this.prisma.client.delete({ where: { id: localId } }).catch(() => undefined);
-        await this.audit.log({
-          actor: 'system:sync',
-          action: 'client.remote-removed',
-          targetId: localId,
-          payload: { remnawaveUuid: uuid },
-        });
+        await this.audit
+          .log({
+            actor: 'system:sync',
+            action: 'client.remote-removed',
+            targetId: localId,
+            payload: { remnawaveUuid: uuid },
+          })
+          .catch((auditErr) =>
+            this.log.warn(
+              `remote-cleanup: audit log failed for ${localId}: ${(auditErr as Error).message}`,
+            ),
+          );
         throw new NotFoundException('Client was removed from Remnawave panel');
       }
       throw e;

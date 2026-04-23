@@ -19,6 +19,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.1",
+    "@nestjs/schedule": "^4.1.0",
     "@prisma/client": "^5.20.0",
     "axios": "^1.7.7",
     "class-transformer": "^0.5.1",

@@ -46,6 +46,7 @@ export function ClientDetails() {
         await api.get<{
           subscriptionUrl: string | null;
           happCryptoLink: string | null;
+          happError: 'no-subscription-url' | 'encrypt-failed' | null;
           onlineAt: string | null;
           firstConnectedAt: string | null;
           lastTrafficResetAt: string | null;
@@ -174,6 +175,13 @@ export function ClientDetails() {
       <CopyCard
         label="Happ Crypto Link"
         value={sub.data?.happCryptoLink ?? null}
+        emptyText={
+          sub.data?.happError === 'encrypt-failed'
+            ? 'Панель Remnawave не вернула зашифрованную ссылку (обновите панель).'
+            : sub.data?.happError === 'no-subscription-url'
+              ? 'В Remnawave у этого клиента нет subscription-URL.'
+              : undefined
+        }
         onCopy={copyText}
         loading={sub.isLoading}
       />
@@ -292,11 +300,13 @@ function CopyCard({
   value,
   onCopy,
   loading,
+  emptyText,
 }: {
   label: string;
   value: string | null;
   onCopy: (v: string) => void;
   loading?: boolean;
+  emptyText?: string;
 }) {
   return (
     <Card className="space-y-2">
@@ -326,7 +336,7 @@ function CopyCard({
           {value}
         </button>
       ) : (
-        <p className="text-sm text-tg-hint">Ссылка недоступна</p>
+        <p className="text-sm text-tg-hint">{emptyText ?? 'Ссылка недоступна'}</p>
       )}
     </Card>
   );

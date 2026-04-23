@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ClientStatus, Prisma } from '@prisma/client';
@@ -17,6 +18,8 @@ const GB = 1024 ** 3;
 
 @Injectable()
 export class ClientsService {
+  private readonly log = new Logger(ClientsService.name);
+
   constructor(
     private prisma: PrismaService,
     private remna: RemnawaveService,
@@ -287,9 +290,15 @@ export class ClientsService {
 
   async subscription(resellerId: string, id: string) {
     const c = await this.ownClient(resellerId, id);
-    // Re-fetch from panel to always return fresh data (url + online/traffic stats)
-    const remna = await this.remna.getUserByUuid(c.remnawaveUuid);
-    const subscriptionUrl = remna.subscriptionUrl ?? c.subscriptionUrl ?? null;
+    // Re-fetch from panel to always return fresh data (url + online/traffic stats).
+    // If the panel 404s the user was removed there — clean up locally too.
+    const remna = await this.fetchRemoteOrCleanup(c.id, c.remnawaveUuid);
+
+    const subscriptionUrl =
+      remna.subscriptionUrl && remna.subscriptionUrl.length > 0
+        ? remna.subscriptionUrl
+        : c.subscriptionUrl ?? null;
+
     if (remna.subscriptionUrl && remna.subscriptionUrl !== c.subscriptionUrl) {
       await this.prisma.client.update({
         where: { id },
@@ -297,25 +306,35 @@ export class ClientsService {
       });
     }
 
-    // Encrypting the subscription URL is best-effort: if the panel is on an
-    // older version or the system endpoint is unreachable, just omit the
-    // link instead of failing the whole request. The panel already returns
-    // a fully-formed `happ://crypt4/...` string, so we use it verbatim.
+    // Happ Crypto Link:
+    // The panel's encrypt endpoint returns a fully-formed `happ://crypt4/...`
+    // already. Failures are logged so the UI can differentiate between
+    // "missing subscription url" vs "encrypt endpoint unreachable".
     let happCryptoLink: string | null = null;
-    if (subscriptionUrl) {
+    let happError: string | null = null;
+    if (!subscriptionUrl) {
+      happError = 'no-subscription-url';
+      this.log.warn(
+        `happ: client ${c.username} (${c.remnawaveUuid}) has no subscriptionUrl from Remnawave`,
+      );
+    } else {
       try {
         const encrypted = await this.remna.encryptHappCryptoLink(subscriptionUrl);
         happCryptoLink = encrypted.startsWith('happ://')
           ? encrypted
           : `happ://crypt4/${encrypted}`;
-      } catch {
-        happCryptoLink = null;
+      } catch (e) {
+        happError = 'encrypt-failed';
+        this.log.warn(
+          `happ: encrypt failed for ${c.username}: ${(e as Error).message}`,
+        );
       }
     }
 
     return {
       subscriptionUrl,
       happCryptoLink,
+      happError,
       onlineAt: remna.onlineAt ?? null,
       firstConnectedAt: remna.firstConnectedAt ?? null,
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
@@ -355,5 +374,38 @@ export class ClientsService {
     const c = await this.prisma.client.findUnique({ where: { id } });
     if (!c || c.resellerId !== resellerId) throw new NotFoundException('Client not found');
     return c;
+  }
+
+  /**
+   * Fetch a remote Remnawave user. If the panel returns 404 (the admin
+   * removed the user directly in Remnawave), delete the local row and
+   * translate the error into a 404 so the UI treats the client as gone.
+   */
+  private async fetchRemoteOrCleanup(localId: string, uuid: string) {
+    try {
+      return await this.remna.getUserByUuid(uuid);
+    } catch (e) {
+      const status = this.remoteErrorStatus(e);
+      if (status === 404) {
+        await this.prisma.client.delete({ where: { id: localId } }).catch(() => undefined);
+        await this.audit.log({
+          actor: 'system:sync',
+          action: 'client.remote-removed',
+          targetId: localId,
+          payload: { remnawaveUuid: uuid },
+        });
+        throw new NotFoundException('Client was removed from Remnawave panel');
+      }
+      throw e;
+    }
+  }
+
+  private remoteErrorStatus(e: unknown): number | undefined {
+    if (e && typeof e === 'object') {
+      const maybe = e as { status?: number; getStatus?: () => number };
+      if (typeof maybe.status === 'number') return maybe.status;
+      if (typeof maybe.getStatus === 'function') return maybe.getStatus();
+    }
+    return undefined;
   }
 }

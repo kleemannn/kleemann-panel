@@ -140,11 +140,19 @@ export class BackupService {
     // Resellers
     const resellerIdByTelegramId = new Map<string, string>();
     for (const r of file.resellers) {
+      const tg = BigInt(r.telegramId);
+      const existing = await this.prisma.reseller
+        .findUnique({ where: { telegramId: tg } })
+        .catch(() => null);
+
+      // If the reseller already exists we must index it immediately, so that
+      // even if the update below fails (e.g. tag unique collision) we can still
+      // attach their clients during the client pass.
+      if (existing) resellerIdByTelegramId.set(r.telegramId, existing.id);
+
       try {
-        const tg = BigInt(r.telegramId);
-        const existing = await this.prisma.reseller.findUnique({ where: { telegramId: tg } });
         if (existing) {
-          const updated = await this.prisma.reseller.update({
+          await this.prisma.reseller.update({
             where: { id: existing.id },
             data: {
               username: r.username,
@@ -158,7 +166,6 @@ export class BackupService {
               // role intentionally not overwritten — don't accidentally demote current admin
             },
           });
-          resellerIdByTelegramId.set(r.telegramId, updated.id);
           report.resellers.updated++;
         } else {
           const created = await this.prisma.reseller.create({
@@ -205,14 +212,19 @@ export class BackupService {
           where: { id: resellerId },
         });
 
-        // Clamp expiration to the future; expired clients still get recreated
-        // with a 1-day grace window so Remnawave accepts them.
+        // Preserve intent:
+        //   - null  => client had no expiry; use a very long future date so Remnawave accepts it.
+        //   - past  => client was expired; give a 1-day grace so it gets created, admin can extend.
+        //   - future=> keep as is.
         const requestedExpire = c.expiresAt ? new Date(c.expiresAt) : null;
         const now = new Date();
+        const NEVER_EXPIRES = new Date(now.getTime() + 10 * 365 * 864e5); // ~10 years
         const expireAt =
-          requestedExpire && requestedExpire.getTime() > now.getTime()
-            ? requestedExpire
-            : new Date(now.getTime() + 864e5);
+          requestedExpire === null
+            ? NEVER_EXPIRES
+            : requestedExpire.getTime() > now.getTime()
+              ? requestedExpire
+              : new Date(now.getTime() + 864e5);
 
         const squadUuid = await this.squads.getSquadUuidForType(reseller.type);
 

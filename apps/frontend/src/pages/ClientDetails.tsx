@@ -130,35 +130,16 @@ export function ClientDetails() {
           k="Последний раз в сети"
           v={sub.data?.onlineAt ? formatDateTime(sub.data.onlineAt) : '—'}
         />
-        <Row
+        <CopyRow
           k="Subscription"
-          v={
-            sub.data?.subscriptionUrl ? (
-              <button
-                className="text-tg-link break-all text-left"
-                onClick={() => copyText(sub.data!.subscriptionUrl!)}
-              >
-                {sub.data.subscriptionUrl}
-              </button>
-            ) : (
-              '—'
-            )
-          }
+          value={sub.data?.subscriptionUrl ?? null}
+          onCopy={copyText}
         />
-        <Row
+        <CopyRow
           k="Happ Crypto Link"
-          v={
-            sub.data?.happCryptoLink ? (
-              <button
-                className="text-tg-link break-all text-left font-mono text-xs"
-                onClick={() => copyText(sub.data!.happCryptoLink!)}
-              >
-                {sub.data.happCryptoLink}
-              </button>
-            ) : (
-              '—'
-            )
-          }
+          value={sub.data?.happCryptoLink ?? null}
+          onCopy={copyText}
+          mono
         />
       </Card>
 
@@ -241,6 +222,38 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
     <div className="flex items-start justify-between gap-3 py-1">
       <span className="text-tg-hint">{k}</span>
       <span className="text-right break-all">{v}</span>
+    </div>
+  );
+}
+
+function CopyRow({
+  k,
+  value,
+  onCopy,
+  mono,
+}: {
+  k: string;
+  value: string | null;
+  onCopy: (v: string) => void;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1">
+      <span className="text-tg-hint shrink-0">{k}</span>
+      {value ? (
+        <button
+          type="button"
+          onClick={() => onCopy(value)}
+          title="Нажмите, чтобы скопировать"
+          className={`text-tg-link text-right truncate min-w-0 flex-1 ${
+            mono ? 'font-mono text-xs' : ''
+          }`}
+        >
+          {value}
+        </button>
+      ) : (
+        <span>—</span>
+      )}
     </div>
   );
 }

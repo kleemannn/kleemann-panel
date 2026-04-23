@@ -299,11 +299,15 @@ export class ClientsService {
 
     // Encrypting the subscription URL is best-effort: if the panel is on an
     // older version or the system endpoint is unreachable, just omit the
-    // link instead of failing the whole request.
+    // link instead of failing the whole request. The panel already returns
+    // a fully-formed `happ://crypt4/...` string, so we use it verbatim.
     let happCryptoLink: string | null = null;
     if (subscriptionUrl) {
       try {
-        happCryptoLink = `happ://crypt4/${await this.remna.encryptHappCryptoLink(subscriptionUrl)}`;
+        const encrypted = await this.remna.encryptHappCryptoLink(subscriptionUrl);
+        happCryptoLink = encrypted.startsWith('happ://')
+          ? encrypted
+          : `happ://crypt4/${encrypted}`;
       } catch {
         happCryptoLink = null;
       }

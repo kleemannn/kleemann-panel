@@ -9,12 +9,16 @@ import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 const PRESETS = [7, 30];
 
+type Mode = 'preset' | 'custom' | 'date';
+
 export function CreateClient() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [username, setUsername] = useState('');
   const [duration, setDuration] = useState(30);
   const [customDuration, setCustomDuration] = useState<string>('');
+  const [untilDate, setUntilDate] = useState<string>('');
+  const [mode, setMode] = useState<Mode>('preset');
   const [unlimited, setUnlimited] = useState(true);
   const [trafficGb, setTrafficGb] = useState<string>('100');
   const [note, setNote] = useState('');
@@ -22,12 +26,23 @@ export function CreateClient() {
 
   const mut = useMutation({
     mutationFn: async () => {
-      const durationDays = customDuration ? Number(customDuration) : duration;
-      const body: Record<string, unknown> = { username, durationDays };
+      const body: Record<string, unknown> = { username };
+      if (mode === 'date') {
+        if (!untilDate) throw new Error('Выбери дату');
+        body.expiresAt = new Date(`${untilDate}T23:59:59`).toISOString();
+      } else {
+        const durationDays = mode === 'custom' ? Number(customDuration) : duration;
+        if (!Number.isFinite(durationDays) || durationDays <= 0) {
+          throw new Error('Введи корректное число дней');
+        }
+        body.durationDays = durationDays;
+      }
       if (!unlimited) body.trafficLimitGb = Number(trafficGb);
       if (note) body.note = note;
       const parsedLimit = Number(deviceLimit);
-      if (Number.isFinite(parsedLimit) && parsedLimit >= 0) body.hwidDeviceLimit = parsedLimit;
+      if (deviceLimit.trim() !== '' && Number.isFinite(parsedLimit) && parsedLimit >= 0) {
+        body.hwidDeviceLimit = parsedLimit;
+      }
       const { data } = await api.post('/clients', body);
       return data;
     },
@@ -74,11 +89,13 @@ export function CreateClient() {
               key={d}
               type="button"
               onClick={() => {
+                setMode('preset');
                 setDuration(d);
                 setCustomDuration('');
+                setUntilDate('');
               }}
               className={`shrink-0 rounded-full px-3 py-2 text-sm ${
-                !customDuration && duration === d
+                mode === 'preset' && duration === d
                   ? 'bg-tg-button text-tg-buttonText'
                   : 'bg-tg-secondary'
               }`}
@@ -92,7 +109,24 @@ export function CreateClient() {
             type="number"
             min={1}
             value={customDuration}
-            onChange={(e) => setCustomDuration(e.target.value)}
+            onChange={(e) => {
+              setCustomDuration(e.target.value);
+              setMode(e.target.value ? 'custom' : 'preset');
+              if (e.target.value) setUntilDate('');
+            }}
+          />
+        </div>
+        <div className="mt-2">
+          <Input
+            label="или до даты"
+            type="date"
+            min={new Date().toISOString().slice(0, 10)}
+            value={untilDate}
+            onChange={(e) => {
+              setUntilDate(e.target.value);
+              setMode(e.target.value ? 'date' : 'preset');
+              if (e.target.value) setCustomDuration('');
+            }}
           />
         </div>
       </div>

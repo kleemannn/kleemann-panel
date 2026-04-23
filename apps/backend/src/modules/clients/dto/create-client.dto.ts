@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsInt,
   IsOptional,
   IsString,
@@ -6,6 +7,7 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateClientDto {
@@ -16,10 +18,16 @@ export class CreateClientDto {
   })
   username!: string;
 
+  @ValidateIf((o: CreateClientDto) => o.expiresAt === undefined || o.expiresAt === null)
   @IsInt()
   @Min(1)
   @Max(3650)
-  durationDays!: number;
+  durationDays?: number;
+
+  // Absolute ISO date. When provided, overrides durationDays.
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
 
   // null / undefined => unlimited
   @IsOptional()

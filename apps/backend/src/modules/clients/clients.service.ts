@@ -93,7 +93,17 @@ export class ClientsService {
     }
 
     // Clamp client expiration to reseller expiration (resellers only; admins are uncapped)
-    let expireAt = new Date(Date.now() + dto.durationDays * 864e5);
+    let expireAt: Date;
+    if (dto.expiresAt) {
+      expireAt = new Date(dto.expiresAt);
+      if (Number.isNaN(expireAt.getTime()) || expireAt.getTime() <= Date.now()) {
+        throw new BadRequestException('expiresAt must be a future date');
+      }
+    } else if (dto.durationDays) {
+      expireAt = new Date(Date.now() + dto.durationDays * 864e5);
+    } else {
+      throw new BadRequestException('Either durationDays or expiresAt is required');
+    }
     if (!isAdmin && reseller.expiresAt && expireAt > reseller.expiresAt) {
       expireAt = reseller.expiresAt;
     }
@@ -146,7 +156,8 @@ export class ClientsService {
       targetId: client.id,
       payload: {
         username: client.username,
-        durationDays: dto.durationDays,
+        durationDays: dto.durationDays ?? null,
+        expiresAt: expireAt.toISOString(),
         trafficLimitGb: dto.trafficLimitGb ?? null,
         squadUuid,
       },
@@ -163,8 +174,18 @@ export class ClientsService {
     if (!reseller.isActive) throw new ForbiddenException('Reseller is disabled');
     const isAdmin = reseller.role === 'ADMIN';
 
-    const base = c.expiresAt && c.expiresAt > new Date() ? c.expiresAt : new Date();
-    let newExpire = new Date(base.getTime() + dto.durationDays * 864e5);
+    let newExpire: Date;
+    if (dto.expiresAt) {
+      newExpire = new Date(dto.expiresAt);
+      if (Number.isNaN(newExpire.getTime()) || newExpire.getTime() <= Date.now()) {
+        throw new BadRequestException('expiresAt must be a future date');
+      }
+    } else if (dto.durationDays) {
+      const base = c.expiresAt && c.expiresAt > new Date() ? c.expiresAt : new Date();
+      newExpire = new Date(base.getTime() + dto.durationDays * 864e5);
+    } else {
+      throw new BadRequestException('Either durationDays or expiresAt is required');
+    }
     if (!isAdmin && reseller.expiresAt && newExpire > reseller.expiresAt) {
       newExpire = reseller.expiresAt;
     }
@@ -183,7 +204,11 @@ export class ClientsService {
       resellerId,
       action: 'client.extend',
       targetId: id,
-      payload: { durationDays: dto.durationDays, newExpiresAt: newExpire.toISOString() },
+      payload: {
+        durationDays: dto.durationDays ?? null,
+        requestedExpiresAt: dto.expiresAt ?? null,
+        newExpiresAt: newExpire.toISOString(),
+      },
     });
 
     return this.serialize(updated);

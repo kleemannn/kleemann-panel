@@ -494,12 +494,15 @@ export class ClientsService {
   ): string | null {
     const cover = this.cfg.get<string>('HAPP_COVER_HOST');
     const backend = this.cfg.get<string>('HAPP_BACKEND_HOST');
-    if (!cover || !backend || !shortUuid) return null;
+    // Google variant is only produced when the reseller has a Provider ID set.
+    // Without it there's nothing to distinguish the cover URL, so fall back to
+    // the plain subscription URL only.
+    if (!cover || !backend || !shortUuid || !providerId) return null;
 
     const params = new URLSearchParams();
     params.set('resolve-address', cover);
     params.set('host', backend);
-    if (providerId) params.set('providerid', providerId);
+    params.set('providerid', providerId);
 
     return `https://${cover}/sub/${shortUuid}#?${params.toString()}`;
   }

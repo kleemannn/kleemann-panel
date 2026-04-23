@@ -16,6 +16,7 @@ interface Reseller {
   username?: string | null;
   firstName?: string | null;
   tag?: string | null;
+  providerId?: string | null;
   type: 'STANDARD' | 'PREMIUM';
   maxClients: number;
   clientsCount: number;
@@ -110,6 +111,7 @@ export function Resellers() {
                     </div>
                     <div className="mt-0.5 text-xs text-tg-hint">
                       {r.type} · до {formatDate(r.expiresAt ?? null)}
+                      {r.providerId ? ` · ID: ${r.providerId}` : ''}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="h-1 flex-1 overflow-hidden rounded-full bg-black/[0.06]">

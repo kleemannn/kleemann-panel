@@ -15,6 +15,7 @@ export function ResellerCreate() {
   const [telegramId, setTelegramId] = useState('');
   const [username, setUsername] = useState('');
   const [tag, setTag] = useState('');
+  const [providerId, setProviderId] = useState('');
   const [type, setType] = useState<'STANDARD' | 'PREMIUM'>('STANDARD');
   const [maxClients, setMaxClients] = useState('50');
   const [expiresAt, setExpiresAt] = useState<string>('');
@@ -28,6 +29,7 @@ export function ResellerCreate() {
       };
       if (username) body.username = username;
       if (tag) body.tag = tag;
+      if (providerId.trim()) body.providerId = providerId.trim();
       if (expiresAt) body.expiresAt = new Date(expiresAt).toISOString();
       const { data } = await api.post('/admin/resellers', body);
       return data;
@@ -80,6 +82,13 @@ export function ResellerCreate() {
         onChange={(e) =>
           setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))
         }
+      />
+      <Input
+        label="Provider ID"
+        placeholder="необязательно"
+        hint="Идентификатор провайдера, задаёт админ"
+        value={providerId}
+        onChange={(e) => setProviderId(e.target.value)}
       />
       <Select
         label="Тип"

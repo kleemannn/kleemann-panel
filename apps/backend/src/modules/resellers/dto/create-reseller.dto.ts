@@ -35,4 +35,9 @@ export class CreateResellerDto {
     message: 'tag must be 1-16 chars of A-Z, 0-9 or underscore',
   })
   tag?: string;
+
+  // Free-form provider identifier (external billing/partner id). Admin only.
+  @IsOptional()
+  @IsString()
+  providerId?: string;
 }

@@ -18,6 +18,7 @@ interface ResellerDump {
   firstName: string | null;
   lastName: string | null;
   tag: string | null;
+  providerId: string | null;
   role: Role;
   type: ResellerType;
   maxClients: number;
@@ -87,6 +88,7 @@ export class BackupService {
         firstName: r.firstName,
         lastName: r.lastName,
         tag: r.tag,
+        providerId: r.providerId,
         role: r.role,
         type: r.type,
         maxClients: r.maxClients,
@@ -159,6 +161,7 @@ export class BackupService {
               firstName: r.firstName,
               lastName: r.lastName,
               tag: r.tag,
+              providerId: r.providerId ?? null,
               type: r.type,
               maxClients: r.maxClients,
               expiresAt: r.expiresAt ? new Date(r.expiresAt) : null,
@@ -175,6 +178,7 @@ export class BackupService {
               firstName: r.firstName,
               lastName: r.lastName,
               tag: r.tag,
+              providerId: r.providerId ?? null,
               role: r.role,
               type: r.type,
               maxClients: r.maxClients,

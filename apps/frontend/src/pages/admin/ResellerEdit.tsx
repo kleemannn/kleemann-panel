@@ -16,6 +16,7 @@ interface Reseller {
   username?: string | null;
   firstName?: string | null;
   tag?: string | null;
+  providerId?: string | null;
   type: 'STANDARD' | 'PREMIUM';
   maxClients: number;
   clientsCount: number;
@@ -38,6 +39,7 @@ export function ResellerEdit() {
   const [expiresAt, setExpiresAt] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [tag, setTag] = useState('');
+  const [providerId, setProviderId] = useState('');
 
   useEffect(() => {
     if (q.data) {
@@ -46,6 +48,7 @@ export function ResellerEdit() {
       setExpiresAt(q.data.expiresAt ? q.data.expiresAt.slice(0, 10) : '');
       setIsActive(q.data.isActive);
       setTag(q.data.tag ?? '');
+      setProviderId(q.data.providerId ?? '');
     }
   }, [q.data]);
 
@@ -57,6 +60,7 @@ export function ResellerEdit() {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         isActive,
         tag: tag || '',
+        providerId: providerId.trim() || '',
       });
     },
     onSuccess: () => {
@@ -133,6 +137,13 @@ export function ResellerEdit() {
         onChange={(e) =>
           setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16))
         }
+      />
+      <Input
+        label="Provider ID"
+        placeholder="необязательно"
+        hint="Идентификатор провайдера, задаёт админ. Пусто = убрать."
+        value={providerId}
+        onChange={(e) => setProviderId(e.target.value)}
       />
       <Input
         label="Действует до"

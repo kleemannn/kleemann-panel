@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ClientStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RemnawaveService } from '../remnawave/remnawave.service';
@@ -25,6 +26,7 @@ export class ClientsService {
     private remna: RemnawaveService,
     private squads: SquadMappingService,
     private audit: AuditService,
+    private cfg: ConfigService,
   ) {}
 
   private serialize<T extends { telegramId?: bigint | null }>(c: T) {
@@ -294,7 +296,7 @@ export class ClientsService {
     // If the panel 404s the user was removed there — clean up locally too.
     const remna = await this.fetchRemoteOrCleanup(c.id, c.remnawaveUuid);
 
-    const subscriptionUrl =
+    const rawSubscriptionUrl =
       remna.subscriptionUrl && remna.subscriptionUrl.length > 0
         ? remna.subscriptionUrl
         : c.subscriptionUrl ?? null;
@@ -305,6 +307,20 @@ export class ClientsService {
         data: { subscriptionUrl: remna.subscriptionUrl },
       });
     }
+
+    // Optional rewrite of Remnawave subscription URL into a cover-domain form
+    // that Happ understands: it points at a benign host (e.g. www.google.com)
+    // and uses `#?resolve-address=...&host=...&providerid=...` to tell Happ
+    // the real backend host and the reseller's provider id. Configured via
+    // HAPP_COVER_HOST + HAPP_BACKEND_HOST env vars; if unset, behaves as before.
+    const reseller = await this.prisma.reseller.findUnique({
+      where: { id: resellerId },
+      select: { providerId: true },
+    });
+    const shortUuid =
+      (remna.shortUuid as string | undefined | null) ?? c.shortUuid ?? this.extractShortUuid(rawSubscriptionUrl);
+    const coverUrl = this.buildHappCoverUrl(shortUuid, reseller?.providerId ?? null);
+    const subscriptionUrl = coverUrl ?? rawSubscriptionUrl;
 
     // Happ Crypto Link:
     // The panel's encrypt endpoint returns a fully-formed `happ://crypt4/...`
@@ -445,5 +461,45 @@ export class ClientsService {
       if (typeof maybe.getStatus === 'function') return maybe.getStatus();
     }
     return undefined;
+  }
+
+  /**
+   * Rewrite Remnawave subscription URL into Happ's cover-domain form:
+   *   https://{COVER}/sub/{shortUuid}#?resolve-address={COVER}&host={BACKEND}&providerid={providerId}
+   *
+   * Returns `null` when either env var is missing or we couldn't determine
+   * the shortUuid (falls back to the raw Remnawave URL in that case).
+   */
+  private buildHappCoverUrl(
+    shortUuid: string | null | undefined,
+    providerId: string | null,
+  ): string | null {
+    const cover = this.cfg.get<string>('HAPP_COVER_HOST');
+    const backend = this.cfg.get<string>('HAPP_BACKEND_HOST');
+    if (!cover || !backend || !shortUuid) return null;
+
+    const params = new URLSearchParams();
+    params.set('resolve-address', cover);
+    params.set('host', backend);
+    if (providerId) params.set('providerid', providerId);
+
+    return `https://${cover}/sub/${shortUuid}#?${params.toString()}`;
+  }
+
+  /**
+   * Best-effort extraction of Remnawave `shortUuid` from a subscription URL
+   * like `https://sub.example.com/sub/<shortUuid>` or `.../api/sub/<shortUuid>`.
+   * Returns null when the URL is absent or doesn't match the expected shape.
+   */
+  private extractShortUuid(url: string | null): string | null {
+    if (!url) return null;
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      const subIdx = parts.lastIndexOf('sub');
+      if (subIdx >= 0 && parts[subIdx + 1]) return parts[subIdx + 1];
+      return parts[parts.length - 1] ?? null;
+    } catch {
+      return null;
+    }
   }
 }

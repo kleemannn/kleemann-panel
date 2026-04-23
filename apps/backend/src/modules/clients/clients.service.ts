@@ -308,44 +308,26 @@ export class ClientsService {
       });
     }
 
-    // Optional rewrite of Remnawave subscription URL into a cover-domain form
-    // that Happ understands: it points at a benign host (e.g. www.google.com)
-    // and uses `#?resolve-address=...&host=...&providerid=...` to tell Happ
-    // the real backend host and the reseller's provider id. Configured via
-    // HAPP_COVER_HOST + HAPP_BACKEND_HOST env vars; if unset, behaves as before.
+    // Two subscription variants are exposed to the UI:
+    //   1. `plain`  — the raw Remnawave subscription URL (what the panel gives us).
+    //   2. `google` — a cover-domain rewrite into Happ's
+    //        https://{COVER}/sub/{shortUuid}#?resolve-address={COVER}&host={BACKEND}&providerid={providerId}
+    //      form. Only available when HAPP_COVER_HOST + HAPP_BACKEND_HOST env
+    //      vars are set; otherwise `google.*` fields are null.
     const reseller = await this.prisma.reseller.findUnique({
       where: { id: resellerId },
       select: { providerId: true },
     });
     const shortUuid =
-      (remna.shortUuid as string | undefined | null) ?? c.shortUuid ?? this.extractShortUuid(rawSubscriptionUrl);
-    const coverUrl = this.buildHappCoverUrl(shortUuid, reseller?.providerId ?? null);
-    const subscriptionUrl = coverUrl ?? rawSubscriptionUrl;
+      (remna.shortUuid as string | undefined | null) ??
+      c.shortUuid ??
+      this.extractShortUuid(rawSubscriptionUrl);
+    const googleUrl = this.buildHappCoverUrl(shortUuid, reseller?.providerId ?? null);
 
-    // Happ Crypto Link:
-    // The panel's encrypt endpoint returns a fully-formed `happ://crypt4/...`
-    // already. Failures are logged so the UI can differentiate between
-    // "missing subscription url" vs "encrypt endpoint unreachable".
-    let happCryptoLink: string | null = null;
-    let happError: string | null = null;
-    if (!subscriptionUrl) {
-      happError = 'no-subscription-url';
-      this.log.warn(
-        `happ: client ${c.username} (${c.remnawaveUuid}) has no subscriptionUrl from Remnawave`,
-      );
-    } else {
-      try {
-        const encrypted = await this.remna.encryptHappCryptoLink(subscriptionUrl);
-        happCryptoLink = encrypted.startsWith('happ://')
-          ? encrypted
-          : `happ://crypt4/${encrypted}`;
-      } catch (e) {
-        happError = 'encrypt-failed';
-        this.log.warn(
-          `happ: encrypt failed for ${c.username}: ${(e as Error).message}`,
-        );
-      }
-    }
+    const plain = await this.buildSubscriptionVariant(c, rawSubscriptionUrl, 'plain');
+    const google = googleUrl
+      ? await this.buildSubscriptionVariant(c, googleUrl, 'google')
+      : { url: null, happCryptoLink: null, happError: 'no-subscription-url' as const };
 
     // Remnawave user object may not include `onlineAt` (older panel versions
     // or users imported without activity). Derive a fallback from HWID device
@@ -380,13 +362,49 @@ export class ClientsService {
     }
 
     return {
-      subscriptionUrl,
-      happCryptoLink,
-      happError,
+      // Back-compat: older clients still read these top-level fields.
+      // They mirror the `plain` variant (direct Remnawave URL).
+      subscriptionUrl: plain.url,
+      happCryptoLink: plain.happCryptoLink,
+      happError: plain.happError,
+      // Two explicit variants — UI renders both as separate cards.
+      plain,
+      google,
       onlineAt,
       firstConnectedAt: remna.firstConnectedAt ?? null,
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
     };
+  }
+
+  /**
+   * Build a `{ url, happCryptoLink, happError }` triple for a given raw URL.
+   * Runs the Remnawave happ-encrypt endpoint so the UI has a ready-to-share
+   * `happ://crypt4/...` link. Logs failures with the variant label for easier
+   * diagnosis when only one of the two variants is broken.
+   */
+  private async buildSubscriptionVariant(
+    c: { username: string; remnawaveUuid: string },
+    url: string | null,
+    variant: 'plain' | 'google',
+  ): Promise<{ url: string | null; happCryptoLink: string | null; happError: string | null }> {
+    if (!url) {
+      this.log.warn(
+        `happ(${variant}): client ${c.username} (${c.remnawaveUuid}) has no subscriptionUrl`,
+      );
+      return { url: null, happCryptoLink: null, happError: 'no-subscription-url' };
+    }
+    try {
+      const encrypted = await this.remna.encryptHappCryptoLink(url);
+      const happCryptoLink = encrypted.startsWith('happ://')
+        ? encrypted
+        : `happ://crypt4/${encrypted}`;
+      return { url, happCryptoLink, happError: null };
+    } catch (e) {
+      this.log.warn(
+        `happ(${variant}): encrypt failed for ${c.username}: ${(e as Error).message}`,
+      );
+      return { url, happCryptoLink: null, happError: 'encrypt-failed' };
+    }
   }
 
   async listDevices(resellerId: string, id: string) {

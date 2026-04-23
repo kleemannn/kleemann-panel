@@ -47,6 +47,16 @@ export function ClientDetails() {
           subscriptionUrl: string | null;
           happCryptoLink: string | null;
           happError: 'no-subscription-url' | 'encrypt-failed' | null;
+          plain: {
+            url: string | null;
+            happCryptoLink: string | null;
+            happError: 'no-subscription-url' | 'encrypt-failed' | null;
+          };
+          google: {
+            url: string | null;
+            happCryptoLink: string | null;
+            happError: 'no-subscription-url' | 'encrypt-failed' | null;
+          };
           onlineAt: string | null;
           firstConnectedAt: string | null;
           lastTrafficResetAt: string | null;
@@ -172,13 +182,29 @@ export function ClientDetails() {
         </div>
       </Card>
 
+      {sub.data?.google?.url && (
+        <CopyCard
+          label="Google Subscription"
+          value={sub.data.google.happCryptoLink}
+          emptyText={
+            sub.data.google.happError === 'encrypt-failed'
+              ? 'Панель Remnawave не вернула зашифрованную ссылку (обновите панель).'
+              : sub.data.google.happError === 'no-subscription-url'
+                ? 'Для этого клиента нет Google-ссылки (проверь HAPP_COVER_HOST / HAPP_BACKEND_HOST).'
+                : undefined
+          }
+          onCopy={copyText}
+          loading={sub.isLoading}
+        />
+      )}
+
       <CopyCard
-        label="Happ Crypto Link"
-        value={sub.data?.happCryptoLink ?? null}
+        label="Subscription"
+        value={sub.data?.plain?.happCryptoLink ?? sub.data?.happCryptoLink ?? null}
         emptyText={
-          sub.data?.happError === 'encrypt-failed'
+          (sub.data?.plain?.happError ?? sub.data?.happError) === 'encrypt-failed'
             ? 'Панель Remnawave не вернула зашифрованную ссылку (обновите панель).'
-            : sub.data?.happError === 'no-subscription-url'
+            : (sub.data?.plain?.happError ?? sub.data?.happError) === 'no-subscription-url'
               ? 'В Remnawave у этого клиента нет subscription-URL.'
               : undefined
         }

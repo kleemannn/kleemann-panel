@@ -331,11 +331,43 @@ export class ClientsService {
       }
     }
 
+    // Remnawave user object may not include `onlineAt` (older panel versions
+    // or users imported without activity). Derive a fallback from HWID device
+    // `updatedAt` — each heartbeat/connection bumps it.
+    let onlineAt: string | null = (remna.onlineAt as string | null | undefined) ?? null;
+    try {
+      const devicesList = await this.remna.listUserHwidDevices(c.remnawaveUuid);
+      const latest = devicesList.devices
+        .map((d) => d.updatedAt)
+        .filter((v): v is string => typeof v === 'string' && v.length > 0)
+        .sort()
+        .pop();
+      if (latest && (!onlineAt || new Date(latest).getTime() > new Date(onlineAt).getTime())) {
+        onlineAt = latest;
+      }
+    } catch (e) {
+      this.log.warn(
+        `online-fallback: failed to list HWID devices for ${c.username}: ${(e as Error).message}`,
+      );
+    }
+
+    if (!remna.onlineAt) {
+      // Help diagnose which field the panel actually populates for this user.
+      const onlineKeys = Object.keys(remna).filter((k) =>
+        /online|seen|connected|activity/i.test(k),
+      );
+      this.log.debug(
+        `online-fields for ${c.username}: ${onlineKeys
+          .map((k) => `${k}=${JSON.stringify((remna as Record<string, unknown>)[k])}`)
+          .join(', ') || '<none>'}`,
+      );
+    }
+
     return {
       subscriptionUrl,
       happCryptoLink,
       happError,
-      onlineAt: remna.onlineAt ?? null,
+      onlineAt,
       firstConnectedAt: remna.firstConnectedAt ?? null,
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
     };

@@ -102,7 +102,8 @@ export class RemnawaveService {
   }
 
   async updateUser(uuid: string, patch: Partial<RemnaCreateUserInput>): Promise<RemnaUser> {
-    const { data } = await this.http.patch(`/api/users/${uuid}`, patch);
+    // Remnawave's PATCH /api/users takes `uuid` in the body, not the path.
+    const { data } = await this.http.patch('/api/users', { uuid, ...patch });
     return (data.response ?? data) as RemnaUser;
   }
 
@@ -111,22 +112,25 @@ export class RemnawaveService {
   }
 
   async disableUser(uuid: string): Promise<RemnaUser> {
-    const { data } = await this.http.post(`/api/users/${uuid}/disable`);
+    const { data } = await this.http.post(`/api/users/${uuid}/actions/disable`);
     return (data.response ?? data) as RemnaUser;
   }
 
   async enableUser(uuid: string): Promise<RemnaUser> {
-    const { data } = await this.http.post(`/api/users/${uuid}/enable`);
+    const { data } = await this.http.post(`/api/users/${uuid}/actions/enable`);
     return (data.response ?? data) as RemnaUser;
   }
 
   async resetTraffic(uuid: string): Promise<RemnaUser> {
-    const { data } = await this.http.post(`/api/users/${uuid}/reset-traffic`);
+    const { data } = await this.http.post(`/api/users/${uuid}/actions/reset-traffic`);
     return (data.response ?? data) as RemnaUser;
   }
 
   async userUsage(uuid: string, start: string, end: string): Promise<unknown> {
-    const { data } = await this.http.get(`/api/users/${uuid}/usage`, { params: { start, end } });
+    // Per-user bandwidth endpoint lives under Bandwidth Stats controller now.
+    const { data } = await this.http.get(`/api/bandwidth-stats/users/${uuid}/legacy`, {
+      params: { start, end },
+    });
     return data.response ?? data;
   }
 

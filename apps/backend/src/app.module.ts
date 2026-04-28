@@ -12,6 +12,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { HostsModule } from './modules/hosts/hosts.module';
+import { TelegramBotModule } from './modules/telegram-bot/telegram-bot.module';
 import { MeModule } from './modules/me/me.module';
 import { RemnawaveModule } from './modules/remnawave/remnawave.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -32,6 +33,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     BackupModule,
     SyncModule,
     HostsModule,
+    TelegramBotModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

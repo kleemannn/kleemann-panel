@@ -1,18 +1,22 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { HostsService } from './hosts.service';
+import { HostPoolService } from './host-pool.service';
 import {
   BulkReplaceAddressDto,
   ReplaceAddressDto,
 } from './dto/bulk-replace-address.dto';
+import { RotatePoolDto, UpsertHostPoolDto } from './dto/host-pool.dto';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -21,7 +25,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @UseGuards(RolesGuard)
 @Roles(Role.ADMIN)
 export class HostsController {
-  constructor(private svc: HostsService) {}
+  constructor(
+    private svc: HostsService,
+    private pools: HostPoolService,
+  ) {}
 
   @Get()
   list() {
@@ -62,5 +69,36 @@ export class HostsController {
       dto.newPort,
       dto.note,
     );
+  }
+
+  // ---- Pools ----
+  @Get('pools')
+  listPools() {
+    return this.pools.list();
+  }
+
+  @Put('pools')
+  upsertPool(@Body() dto: UpsertHostPoolDto) {
+    return this.pools.upsert({
+      tag: dto.tag,
+      addresses: dto.addresses,
+      currentIdx: dto.currentIdx,
+      port: dto.port ?? null,
+      note: dto.note ?? null,
+    });
+  }
+
+  @Delete('pools/:tag')
+  removePool(@Param('tag') tag: string) {
+    return this.pools.remove(tag);
+  }
+
+  @Post('pools/:tag/rotate')
+  rotate(
+    @CurrentUser() user: JwtUser,
+    @Param('tag') tag: string,
+    @Body() dto: RotatePoolDto,
+  ) {
+    return this.pools.rotate(user.sub, tag, { toIdx: dto.toIdx, note: dto.note });
   }
 }

@@ -99,6 +99,23 @@ model AuditLog {
   @@index([action])
 }
 
+// Per-tag pool of candidate IP/host addresses used to rotate Remnawave hosts
+// when the current backend address gets blocked. `addresses[currentIdx]` is
+// considered the "active" entry; rotateNext() advances the pointer and pushes
+// the new value to every host that shares this tag.
+model HostIpPool {
+  id          String   @id @default(uuid())
+  tag         String   @unique
+  // Ordered list of candidate IP/domain entries.
+  addresses   Json     @default("[]")
+  currentIdx  Int      @default(0)
+  // Optional default port to apply on rotate (overrides per-host port if set).
+  port        Int?
+  note        String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
 // History of bulk IP/address replacements performed by the admin
 // against Remnawave hosts grouped by tag (or one specific host uuid).
 // Used to display "what changed when" in the admin UI and to roll back manually.

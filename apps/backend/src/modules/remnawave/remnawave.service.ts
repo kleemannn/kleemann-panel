@@ -160,4 +160,44 @@ export class RemnawaveService {
     const r = data.response ?? data;
     return (r.squads ?? r) as Array<{ uuid: string; name: string }>;
   }
+
+  // ---- Hosts ----
+  async listHosts(): Promise<RemnaHost[]> {
+    const { data } = await this.http.get('/api/hosts');
+    const r = data.response ?? data;
+    if (Array.isArray(r)) return r as RemnaHost[];
+    return ((r.hosts ?? r.items ?? []) as RemnaHost[]) ?? [];
+  }
+
+  async listHostTags(): Promise<string[]> {
+    const { data } = await this.http.get('/api/hosts/tags');
+    const r = data.response ?? data;
+    if (Array.isArray(r)) return r as string[];
+    return ((r.tags ?? []) as string[]) ?? [];
+  }
+
+  async updateHost(uuid: string, patch: Partial<RemnaHostPatch>): Promise<RemnaHost> {
+    // Remnawave PATCH /api/hosts mirrors users: uuid lives in the body.
+    const { data } = await this.http.patch('/api/hosts', { uuid, ...patch });
+    return (data.response ?? data) as RemnaHost;
+  }
+}
+
+export interface RemnaHost {
+  uuid: string;
+  remark?: string;
+  address: string;
+  port: number;
+  tag?: string | null;
+  isDisabled?: boolean;
+  inbound?: { configProfileUuid: string; configProfileInboundUuid: string };
+  [k: string]: unknown;
+}
+
+export interface RemnaHostPatch {
+  remark: string;
+  address: string;
+  port: number;
+  tag: string | null;
+  isDisabled: boolean;
 }

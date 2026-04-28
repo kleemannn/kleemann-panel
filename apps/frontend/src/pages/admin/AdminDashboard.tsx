@@ -116,6 +116,12 @@ export function AdminDashboard() {
             title="Backup"
             subtitle="Экспорт и восстановление"
           />
+          <ActionCard
+            to="/admin/hosts"
+            icon="shield"
+            title="Хосты"
+            subtitle="Замена IP при блокировках"
+          />
         </div>
       </section>
 

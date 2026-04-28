@@ -98,3 +98,26 @@ model AuditLog {
   @@index([resellerId, createdAt])
   @@index([action])
 }
+
+// History of bulk IP/address replacements performed by the admin
+// against Remnawave hosts grouped by tag (or one specific host uuid).
+// Used to display "what changed when" in the admin UI and to roll back manually.
+model HostIpChange {
+  id               String   @id @default(uuid())
+  // Either a tag (bulk over all hosts with this tag) or null when targeting a single host.
+  tag              String?
+  // When targeting a single host directly, store its Remnawave uuid.
+  hostUuid         String?
+  previousAddress  String?
+  newAddress       String
+  previousPort     Int?
+  newPort          Int?
+  hostsAffected    Int      @default(0)
+  hostsFailed      Int      @default(0)
+  performedBy      String                          // "admin:<id>"
+  note             String?
+  createdAt        DateTime @default(now())
+
+  @@index([tag, createdAt])
+  @@index([hostUuid, createdAt])
+}

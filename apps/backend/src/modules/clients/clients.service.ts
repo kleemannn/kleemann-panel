@@ -329,10 +329,23 @@ export class ClientsService {
       ? await this.buildSubscriptionVariant(c, googleUrl, 'google')
       : { url: null, happCryptoLink: null, happError: 'no-subscription-url' as const };
 
+    // Remnawave 2.5+ nests live stats under `userTraffic`; older versions
+    // returned them at the top level. Read both shapes and prefer the nested
+    // one (it's authoritative on current panel versions).
+    const usedTrafficBytes =
+      remna.userTraffic?.usedTrafficBytes ?? remna.usedTrafficBytes ?? null;
+    const lifetimeUsedTrafficBytes =
+      remna.userTraffic?.lifetimeUsedTrafficBytes ??
+      (remna.lifetimeUsedTrafficBytes as number | undefined) ??
+      null;
+
     // Remnawave user object may not include `onlineAt` (older panel versions
     // or users imported without activity). Derive a fallback from HWID device
     // `updatedAt` — each heartbeat/connection bumps it.
-    let onlineAt: string | null = (remna.onlineAt as string | null | undefined) ?? null;
+    let onlineAt: string | null =
+      (remna.userTraffic?.onlineAt as string | null | undefined) ??
+      (remna.onlineAt as string | null | undefined) ??
+      null;
     try {
       const devicesList = await this.remna.listUserHwidDevices(c.remnawaveUuid);
       const latest = devicesList.devices
@@ -371,8 +384,14 @@ export class ClientsService {
       plain,
       google,
       onlineAt,
-      firstConnectedAt: remna.firstConnectedAt ?? null,
+      firstConnectedAt:
+        (remna.userTraffic?.firstConnectedAt as string | null | undefined) ??
+        remna.firstConnectedAt ??
+        null,
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
+      usedTrafficBytes,
+      lifetimeUsedTrafficBytes,
+      trafficLimitBytes: (remna.trafficLimitBytes as number | undefined) ?? null,
     };
   }
 

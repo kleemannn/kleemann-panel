@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge, ClientStatus } from '@/components/ui/StatusBadge';
-import { formatDate, formatDateTime, formatGb, daysUntil } from '@/lib/format';
+import { formatBytes, formatDate, formatDateTime, formatGb, daysUntil } from '@/lib/format';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
 
 interface Client {
@@ -60,6 +60,9 @@ export function ClientDetails() {
           onlineAt: string | null;
           firstConnectedAt: string | null;
           lastTrafficResetAt: string | null;
+          usedTrafficBytes: number | null;
+          lifetimeUsedTrafficBytes: number | null;
+          trafficLimitBytes: number | null;
         }>(`/clients/${id}/subscription`)
       ).data,
     enabled: !!q.data,
@@ -177,6 +180,14 @@ export function ClientDetails() {
           <Field
             label="Последний онлайн"
             value={sub.data?.onlineAt ? formatDateTime(sub.data.onlineAt) : '—'}
+          />
+          <Field
+            label="Использовано"
+            value={formatBytes(sub.data?.usedTrafficBytes ?? null)}
+          />
+          <Field
+            label="За всё время"
+            value={formatBytes(sub.data?.lifetimeUsedTrafficBytes ?? null)}
           />
           <Field label="Заметка" value={c.note || '—'} wide />
         </div>

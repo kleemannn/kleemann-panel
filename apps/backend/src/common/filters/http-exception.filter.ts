@@ -21,13 +21,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const payload = isHttp ? exception.getResponse() : { message: 'Internal server error' };
 
+    const reason = extractReason(payload);
+    const suffix = reason ? ` — ${reason}` : '';
     if (status >= 500) {
       this.logger.error(
-        `${req.method} ${req.url} → ${status}`,
+        `${req.method} ${req.url} → ${status}${suffix}`,
         (exception as Error)?.stack ?? String(exception),
       );
     } else {
-      this.logger.warn(`${req.method} ${req.url} → ${status}`);
+      this.logger.warn(`${req.method} ${req.url} → ${status}${suffix}`);
     }
 
     res.status(status).json(
@@ -36,4 +38,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
         : { statusCode: status, ...(payload as object) },
     );
   }
+}
+
+function extractReason(payload: unknown): string | null {
+  if (typeof payload === 'string') return payload;
+  if (payload && typeof payload === 'object') {
+    const m = (payload as { message?: unknown }).message;
+    if (typeof m === 'string') return m;
+    if (Array.isArray(m)) return m.join(', ');
+  }
+  return null;
 }

@@ -34,7 +34,24 @@ export interface RemnaUser {
   expireAt?: string;
   subscriptionUrl?: string;
   trafficLimitBytes?: number;
+  /**
+   * Used traffic in the **current period**. May arrive at the top level
+   * (older Remnawave versions) or nested under `userTraffic` (>= 2.5).
+   */
   usedTrafficBytes?: number;
+  /**
+   * Lifetime used traffic — accumulator that is NOT reset by
+   * `/api/users/{uuid}/actions/reset-traffic` (only `usedTrafficBytes` is).
+   * Lives nested in `userTraffic` on newer panels.
+   */
+  lifetimeUsedTrafficBytes?: number;
+  userTraffic?: {
+    usedTrafficBytes?: number;
+    lifetimeUsedTrafficBytes?: number;
+    onlineAt?: string | null;
+    firstConnectedAt?: string | null;
+    lastConnectedNodeUuid?: string | null;
+  };
   activeInternalSquads?: { uuid: string }[] | string[];
   tag?: string | null;
   description?: string | null;

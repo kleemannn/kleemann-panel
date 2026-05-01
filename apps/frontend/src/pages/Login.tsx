@@ -6,9 +6,21 @@ interface Props {
   loginMutation: UseMutationResult<unknown, Error, void>;
 }
 
+function extractErrorMessage(err: unknown): string | null {
+  if (!err) return null;
+  const e = err as {
+    response?: { data?: { message?: string | string[] }; status?: number };
+    message?: string;
+  };
+  const serverMsg = e.response?.data?.message;
+  if (Array.isArray(serverMsg)) return serverMsg.join(', ');
+  if (typeof serverMsg === 'string' && serverMsg.length > 0) return serverMsg;
+  return e.message ?? null;
+}
+
 export function Login({ loginMutation }: Props) {
   const inTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData;
-  const error = loginMutation.error as Error | undefined;
+  const errorMsg = extractErrorMessage(loginMutation.error);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
@@ -36,8 +48,8 @@ export function Login({ loginMutation }: Props) {
         {loginMutation.isPending ? 'Входим…' : 'Войти через Telegram'}
       </Button>
 
-      {error && (
-        <p className="mt-4 max-w-xs text-sm text-red-500">{error.message}</p>
+      {errorMsg && (
+        <p className="mt-4 max-w-xs text-sm text-red-500">{errorMsg}</p>
       )}
     </div>
   );

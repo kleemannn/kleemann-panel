@@ -331,17 +331,19 @@ export class ClientsService {
 
     // Remnawave 2.5+ nests live stats under `userTraffic`; older versions
     // returned them at the top level. When the nested object is present it
-    // is authoritative — even an explicit `null` (e.g. user never connected)
-    // must NOT fall through to a stale top-level value left over from before
-    // the panel migration. Only use the top-level shape when `userTraffic`
-    // is absent altogether.
+    // is authoritative — even an explicit nested `null` (e.g. user never
+    // connected) must NOT fall through to a stale top-level value left over
+    // from before the panel migration. Only use the top-level shape when
+    // `userTraffic` is absent altogether (loose `!= null` so we treat both
+    // `null` and `undefined` as "absent" — JSON can legitimately serialise
+    // either form here).
     const ut = remna.userTraffic;
     const usedTrafficBytes =
-      ut !== undefined
+      ut != null
         ? (ut.usedTrafficBytes ?? null)
         : ((remna.usedTrafficBytes as number | undefined) ?? null);
     const lifetimeUsedTrafficBytes =
-      ut !== undefined
+      ut != null
         ? (ut.lifetimeUsedTrafficBytes ?? null)
         : ((remna.lifetimeUsedTrafficBytes as number | undefined) ?? null);
 
@@ -349,7 +351,7 @@ export class ClientsService {
     // or users imported without activity). Derive a fallback from HWID device
     // `updatedAt` — each heartbeat/connection bumps it.
     let onlineAt: string | null =
-      ut !== undefined
+      ut != null
         ? (ut.onlineAt ?? null)
         : ((remna.onlineAt as string | null | undefined) ?? null);
     try {
@@ -391,7 +393,7 @@ export class ClientsService {
       google,
       onlineAt,
       firstConnectedAt:
-        ut !== undefined
+        ut != null
           ? (ut.firstConnectedAt ?? null)
           : (remna.firstConnectedAt ?? null),
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,

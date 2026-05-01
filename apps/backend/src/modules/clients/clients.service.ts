@@ -330,22 +330,28 @@ export class ClientsService {
       : { url: null, happCryptoLink: null, happError: 'no-subscription-url' as const };
 
     // Remnawave 2.5+ nests live stats under `userTraffic`; older versions
-    // returned them at the top level. Read both shapes and prefer the nested
-    // one (it's authoritative on current panel versions).
+    // returned them at the top level. When the nested object is present it
+    // is authoritative — even an explicit `null` (e.g. user never connected)
+    // must NOT fall through to a stale top-level value left over from before
+    // the panel migration. Only use the top-level shape when `userTraffic`
+    // is absent altogether.
+    const ut = remna.userTraffic;
     const usedTrafficBytes =
-      remna.userTraffic?.usedTrafficBytes ?? remna.usedTrafficBytes ?? null;
+      ut !== undefined
+        ? (ut.usedTrafficBytes ?? null)
+        : ((remna.usedTrafficBytes as number | undefined) ?? null);
     const lifetimeUsedTrafficBytes =
-      remna.userTraffic?.lifetimeUsedTrafficBytes ??
-      (remna.lifetimeUsedTrafficBytes as number | undefined) ??
-      null;
+      ut !== undefined
+        ? (ut.lifetimeUsedTrafficBytes ?? null)
+        : ((remna.lifetimeUsedTrafficBytes as number | undefined) ?? null);
 
     // Remnawave user object may not include `onlineAt` (older panel versions
     // or users imported without activity). Derive a fallback from HWID device
     // `updatedAt` — each heartbeat/connection bumps it.
     let onlineAt: string | null =
-      (remna.userTraffic?.onlineAt as string | null | undefined) ??
-      (remna.onlineAt as string | null | undefined) ??
-      null;
+      ut !== undefined
+        ? (ut.onlineAt ?? null)
+        : ((remna.onlineAt as string | null | undefined) ?? null);
     try {
       const devicesList = await this.remna.listUserHwidDevices(c.remnawaveUuid);
       const latest = devicesList.devices
@@ -385,9 +391,9 @@ export class ClientsService {
       google,
       onlineAt,
       firstConnectedAt:
-        (remna.userTraffic?.firstConnectedAt as string | null | undefined) ??
-        remna.firstConnectedAt ??
-        null,
+        ut !== undefined
+          ? (ut.firstConnectedAt ?? null)
+          : (remna.firstConnectedAt ?? null),
       lastTrafficResetAt: remna.lastTrafficResetAt ?? null,
       usedTrafficBytes,
       lifetimeUsedTrafficBytes,

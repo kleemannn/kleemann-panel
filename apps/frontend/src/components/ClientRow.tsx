@@ -11,6 +11,8 @@ export interface ClientRowModel {
   expiresAt?: string | null;
   trafficLimitGb?: number | null;
   note?: string | null;
+  /** Owning reseller — only joined into the response for ADMIN viewers. */
+  reseller?: { id: string; username?: string | null; tag?: string | null } | null;
 }
 
 function initials(name: string): string {
@@ -57,6 +59,19 @@ export function ClientRow({ c }: { c: ClientRowModel }) {
             {formatDate(c.expiresAt ?? null)} · {formatGb(c.trafficLimitGb ?? null)}
           </span>
         </div>
+        {c.reseller && (
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-tg-hint">
+            <Icon name="store" size={11} />
+            <span className="truncate">
+              {c.reseller.username ? `@${c.reseller.username}` : c.reseller.id.slice(0, 8)}
+            </span>
+            {c.reseller.tag && (
+              <span className="rounded-full bg-tg-button/10 px-1.5 py-px font-mono text-[10px] text-tg-button">
+                {c.reseller.tag}
+              </span>
+            )}
+          </div>
+        )}
         {c.note && (
           <div className="mt-0.5 truncate text-xs text-tg-hint/80">{c.note}</div>
         )}

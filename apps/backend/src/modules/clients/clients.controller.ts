@@ -27,19 +27,21 @@ export class ClientsController {
     @Query('search') search?: string,
     @Query('status') status?: ClientStatus,
     @Query('expiringInDays') expiringInDays?: number,
+    @Query('resellerId') resellerId?: string,
   ) {
-    return this.svc.list(user.sub, {
+    return this.svc.list(user, {
       skip: Number(skip),
       take: Number(take),
       search,
       status,
       expiringInDays: expiringInDays ? Number(expiringInDays) : undefined,
+      resellerId,
     });
   }
 
   @Get(':id')
   get(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.getById(user.sub, id);
+    return this.svc.getById(user, id);
   }
 
   @Post()
@@ -49,37 +51,37 @@ export class ClientsController {
 
   @Patch(':id')
   update(@CurrentUser() user: JwtUser, @Param('id') id: string, @Body() dto: UpdateClientDto) {
-    return this.svc.update(user.sub, id, dto);
+    return this.svc.update(user, id, dto);
   }
 
   @Post(':id/extend')
   extend(@CurrentUser() user: JwtUser, @Param('id') id: string, @Body() dto: ExtendClientDto) {
-    return this.svc.extend(user.sub, id, dto);
+    return this.svc.extend(user, id, dto);
   }
 
   @Post(':id/disable')
   disable(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.disable(user.sub, id);
+    return this.svc.disable(user, id);
   }
 
   @Post(':id/enable')
   enable(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.enable(user.sub, id);
+    return this.svc.enable(user, id);
   }
 
   @Post(':id/reset-traffic')
   reset(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.resetTraffic(user.sub, id);
+    return this.svc.resetTraffic(user, id);
   }
 
   @Delete(':id')
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.remove(user.sub, id);
+    return this.svc.remove(user, id);
   }
 
   @Get(':id/subscription')
   subscription(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.subscription(user.sub, id);
+    return this.svc.subscription(user, id);
   }
 
   @Get(':id/usage')
@@ -89,12 +91,12 @@ export class ClientsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.svc.usage(user.sub, id, from, to);
+    return this.svc.usage(user, id, from, to);
   }
 
   @Get(':id/devices')
   devices(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.listDevices(user.sub, id);
+    return this.svc.listDevices(user, id);
   }
 
   @Delete(':id/devices/:hwid')
@@ -103,6 +105,6 @@ export class ClientsController {
     @Param('id') id: string,
     @Param('hwid') hwid: string,
   ) {
-    return this.svc.deleteDevice(user.sub, id, hwid);
+    return this.svc.deleteDevice(user, id, hwid);
   }
 }

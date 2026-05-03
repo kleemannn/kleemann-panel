@@ -14,6 +14,7 @@ import { AuditService } from '../audit/audit.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { ExtendClientDto } from './dto/extend-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { JwtUser } from '../../common/decorators/current-user.decorator';
 
 const GB = 1024 ** 3;
 
@@ -34,18 +35,29 @@ export class ClientsService {
   }
 
   async list(
-    resellerId: string,
+    user: JwtUser,
     params: {
       skip?: number;
       take?: number;
       search?: string;
       status?: ClientStatus;
       expiringInDays?: number;
+      resellerId?: string;
     } = {},
   ) {
     const take = Math.min(params.take ?? 50, 200);
     const skip = params.skip ?? 0;
-    const where: Prisma.ClientWhereInput = { resellerId };
+    const isAdmin = user.role === 'ADMIN';
+
+    const where: Prisma.ClientWhereInput = {};
+    // Reseller scoping: admin sees everything (or a specific reseller via
+    // ?resellerId=...); non-admin is locked to their own clients regardless
+    // of any client-supplied filter.
+    if (isAdmin) {
+      if (params.resellerId) where.resellerId = params.resellerId;
+    } else {
+      where.resellerId = user.sub;
+    }
     if (params.status) where.status = params.status;
     if (params.search) {
       where.OR = [
@@ -66,15 +78,23 @@ export class ClientsService {
         orderBy: { createdAt: 'desc' },
         take,
         skip,
+        // Admin needs to see who owns each client; resellers don't.
+        include: isAdmin
+          ? { reseller: { select: { id: true, username: true, tag: true } } }
+          : undefined,
       }),
       this.prisma.client.count({ where }),
     ]);
     return { items: items.map((c) => this.serialize(c)), total };
   }
 
-  async getById(resellerId: string, id: string) {
-    const c = await this.prisma.client.findUnique({ where: { id } });
-    if (!c || c.resellerId !== resellerId) throw new NotFoundException('Client not found');
+  async getById(user: JwtUser, id: string) {
+    const c = await this.prisma.client.findUnique({
+      where: { id },
+      include: { reseller: { select: { id: true, username: true, tag: true } } },
+    });
+    if (!c || (user.role !== 'ADMIN' && c.resellerId !== user.sub))
+      throw new NotFoundException('Client not found');
     return this.serialize(c);
   }
 
@@ -171,13 +191,18 @@ export class ClientsService {
     return this.serialize(client);
   }
 
-  async extend(resellerId: string, id: string, dto: ExtendClientDto) {
-    const c = await this.prisma.client.findUnique({ where: { id } });
-    if (!c || c.resellerId !== resellerId) throw new NotFoundException('Client not found');
+  async extend(user: JwtUser, id: string, dto: ExtendClientDto) {
+    const c = await this.ownClient(user, id);
 
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    if (!reseller.isActive) throw new ForbiddenException('Reseller is disabled');
-    const isAdmin = reseller.role === 'ADMIN';
+    // Admin actions clamp against the OWNING reseller (so that extending a
+    // client past their seller's own expiration is still possible only for
+    // admins). Resellers always operate on themselves.
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({
+      where: { id: c.resellerId },
+    });
+    if (!reseller.isActive && user.role !== 'ADMIN')
+      throw new ForbiddenException('Reseller is disabled');
+    const isAdmin = user.role === 'ADMIN';
 
     let newExpire: Date;
     if (dto.expiresAt) {
@@ -205,8 +230,8 @@ export class ClientsService {
     });
 
     await this.audit.log({
-      actor: `reseller:${resellerId}`,
-      resellerId,
+      actor: this.actor(user),
+      resellerId: c.resellerId,
       action: 'client.extend',
       targetId: id,
       payload: {
@@ -219,13 +244,12 @@ export class ClientsService {
     return this.serialize(updated);
   }
 
-  async update(resellerId: string, id: string, dto: UpdateClientDto) {
-    const c = await this.prisma.client.findUnique({ where: { id } });
-    if (!c || c.resellerId !== resellerId) throw new NotFoundException('Client not found');
+  async update(user: JwtUser, id: string, dto: UpdateClientDto) {
+    const c = await this.ownClient(user, id);
 
     const remnaPatch: Record<string, unknown> = {};
     if (dto.note !== undefined) {
-      remnaPatch.description = `reseller:${resellerId}${dto.note ? ` | ${dto.note}` : ''}`;
+      remnaPatch.description = `reseller:${c.resellerId}${dto.note ? ` | ${dto.note}` : ''}`;
     }
     if (dto.trafficLimitGb !== undefined) {
       remnaPatch.trafficLimitBytes = dto.trafficLimitGb ? dto.trafficLimitGb * GB : 0;
@@ -243,8 +267,8 @@ export class ClientsService {
     });
 
     await this.audit.log({
-      actor: `reseller:${resellerId}`,
-      resellerId,
+      actor: this.actor(user),
+      resellerId: c.resellerId,
       action: 'client.update',
       targetId: id,
       payload: dto as unknown as Prisma.InputJsonValue,
@@ -253,45 +277,45 @@ export class ClientsService {
     return this.serialize(updated);
   }
 
-  async disable(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async disable(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     await this.remna.disableUser(c.remnawaveUuid);
     const updated = await this.prisma.client.update({
       where: { id },
       data: { status: ClientStatus.DISABLED },
     });
-    await this.audit.log({ actor: `reseller:${resellerId}`, resellerId, action: 'client.disable', targetId: id });
+    await this.audit.log({ actor: this.actor(user), resellerId: c.resellerId, action: 'client.disable', targetId: id });
     return this.serialize(updated);
   }
 
-  async enable(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async enable(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     await this.remna.enableUser(c.remnawaveUuid);
     const updated = await this.prisma.client.update({
       where: { id },
       data: { status: ClientStatus.ACTIVE },
     });
-    await this.audit.log({ actor: `reseller:${resellerId}`, resellerId, action: 'client.enable', targetId: id });
+    await this.audit.log({ actor: this.actor(user), resellerId: c.resellerId, action: 'client.enable', targetId: id });
     return this.serialize(updated);
   }
 
-  async resetTraffic(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async resetTraffic(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     await this.remna.resetTraffic(c.remnawaveUuid);
-    await this.audit.log({ actor: `reseller:${resellerId}`, resellerId, action: 'client.reset-traffic', targetId: id });
+    await this.audit.log({ actor: this.actor(user), resellerId: c.resellerId, action: 'client.reset-traffic', targetId: id });
     return { ok: true };
   }
 
-  async remove(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async remove(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     await this.remna.deleteUser(c.remnawaveUuid);
     await this.prisma.client.delete({ where: { id } });
-    await this.audit.log({ actor: `reseller:${resellerId}`, resellerId, action: 'client.delete', targetId: id });
+    await this.audit.log({ actor: this.actor(user), resellerId: c.resellerId, action: 'client.delete', targetId: id });
     return { ok: true };
   }
 
-  async subscription(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async subscription(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     // Re-fetch from panel to always return fresh data (url + online/traffic stats).
     // If the panel 404s the user was removed there — clean up locally too.
     const remna = await this.fetchRemoteOrCleanup(c.id, c.remnawaveUuid);
@@ -314,8 +338,11 @@ export class ClientsService {
     //        https://{COVER}/sub/{shortUuid}#?resolve-address={COVER}&host={BACKEND}&providerid={providerId}
     //      form. Only available when HAPP_COVER_HOST + HAPP_BACKEND_HOST env
     //      vars are set; otherwise `google.*` fields are null.
+    // Provider ID belongs to the OWNING reseller, not the requester — when an
+    // admin views someone else's client, we still want their providerid baked
+    // into the Google cover URL.
     const reseller = await this.prisma.reseller.findUnique({
-      where: { id: resellerId },
+      where: { id: c.resellerId },
       select: { providerId: true },
     });
     const shortUuid =
@@ -426,17 +453,17 @@ export class ClientsService {
     }
   }
 
-  async listDevices(resellerId: string, id: string) {
-    const c = await this.ownClient(resellerId, id);
+  async listDevices(user: JwtUser, id: string) {
+    const c = await this.ownClient(user, id);
     return this.remna.listUserHwidDevices(c.remnawaveUuid);
   }
 
-  async deleteDevice(resellerId: string, id: string, hwid: string) {
-    const c = await this.ownClient(resellerId, id);
+  async deleteDevice(user: JwtUser, id: string, hwid: string) {
+    const c = await this.ownClient(user, id);
     const result = await this.remna.deleteUserHwidDevice(c.remnawaveUuid, hwid);
     await this.audit.log({
-      actor: `reseller:${resellerId}`,
-      resellerId,
+      actor: this.actor(user),
+      resellerId: c.resellerId,
       action: 'client.device.delete',
       targetId: id,
       payload: { hwid },
@@ -444,8 +471,8 @@ export class ClientsService {
     return result;
   }
 
-  async usage(resellerId: string, id: string, from?: string, to?: string) {
-    const c = await this.ownClient(resellerId, id);
+  async usage(user: JwtUser, id: string, from?: string, to?: string) {
+    const c = await this.ownClient(user, id);
     const end = to ?? new Date().toISOString();
     const start = from ?? new Date(Date.now() - 30 * 864e5).toISOString();
     try {
@@ -455,10 +482,20 @@ export class ClientsService {
     }
   }
 
-  private async ownClient(resellerId: string, id: string) {
+  /**
+   * Loads a client and enforces ownership scoping. Admins (role=ADMIN) can
+   * access any client; everyone else only their own.
+   */
+  private async ownClient(user: JwtUser, id: string) {
     const c = await this.prisma.client.findUnique({ where: { id } });
-    if (!c || c.resellerId !== resellerId) throw new NotFoundException('Client not found');
+    if (!c || (user.role !== 'ADMIN' && c.resellerId !== user.sub))
+      throw new NotFoundException('Client not found');
     return c;
+  }
+
+  /** Audit `actor` string distinguishes admin actions from reseller actions. */
+  private actor(user: JwtUser): string {
+    return `${user.role === 'ADMIN' ? 'admin' : 'reseller'}:${user.sub}`;
   }
 
   /**

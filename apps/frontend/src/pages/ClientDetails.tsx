@@ -17,6 +17,8 @@ interface Client {
   trafficLimitGb?: number | null;
   note?: string | null;
   subscriptionUrl?: string | null;
+  // Joined-in by backend only when the viewer is ADMIN.
+  reseller?: { id: string; username?: string | null; tag?: string | null } | null;
 }
 
 interface HwidDevice {
@@ -189,6 +191,29 @@ export function ClientDetails() {
             label="За всё время"
             value={formatBytes(sub.data?.lifetimeUsedTrafficBytes ?? null)}
           />
+          {c.reseller && (
+            <Field
+              label="Реселлер"
+              value={
+                <Link
+                  to={`/admin/resellers/${c.reseller.id}`}
+                  className="flex items-center gap-1.5 text-tg-button"
+                >
+                  <span className="truncate">
+                    {c.reseller.username
+                      ? `@${c.reseller.username}`
+                      : c.reseller.id.slice(0, 8)}
+                  </span>
+                  {c.reseller.tag && (
+                    <span className="rounded-full bg-tg-button/10 px-1.5 py-px font-mono text-[10px]">
+                      {c.reseller.tag}
+                    </span>
+                  )}
+                </Link>
+              }
+              wide
+            />
+          )}
           <Field label="Заметка" value={c.note || '—'} wide />
         </div>
       </Card>

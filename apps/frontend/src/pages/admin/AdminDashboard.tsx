@@ -14,6 +14,19 @@ interface AdminSummary {
   activeResellers: number;
   clients: number;
   activeClients: number;
+  expired: number;
+  expiringSoon: number;
+}
+
+interface LifecycleConfig {
+  retentionDays: number;
+}
+
+interface LifecycleResult {
+  flipped?: number;
+  deleted?: number;
+  errors?: number;
+  retentionDays?: number;
 }
 
 interface ImportResult {
@@ -48,6 +61,38 @@ export function AdminDashboard() {
     onError: () => tgHapticError(),
   });
 
+  const lifecycleCfg = useQuery({
+    queryKey: ['admin', 'lifecycle', 'config'],
+    queryFn: async () => (await api.get<LifecycleConfig>('/admin/lifecycle/config')).data,
+  });
+
+  const expireMut = useMutation({
+    mutationFn: async () => (await api.post<LifecycleResult>('/admin/lifecycle/expire')).data,
+    onSuccess: (r) => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'summary'] });
+      const msg = `Помечено как «истёк»: ${r.flipped ?? 0}`;
+      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+    },
+    onError: () => tgHapticError(),
+  });
+
+  const purgeMut = useMutation({
+    mutationFn: async () => (await api.post<LifecycleResult>('/admin/lifecycle/purge')).data,
+    onSuccess: (r) => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'summary'] });
+      const msg =
+        r.retentionDays === 0
+          ? 'Авто-удаление выключено (CLIENT_AUTO_DELETE_DAYS=0).'
+          : `Удалено: ${r.deleted ?? 0}, ошибок: ${r.errors ?? 0}`;
+      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+    },
+    onError: () => tgHapticError(),
+  });
+
   return (
     <div className="space-y-5 p-4">
       <section className="brand-gradient rounded-3xl p-5 text-tg-buttonText shadow-sm">
@@ -72,6 +117,18 @@ export function AdminDashboard() {
           hint={`активных ${s?.activeClients ?? '—'}`}
           icon="users"
           tone="success"
+        />
+        <StatCard
+          label="Истекают ≤7д"
+          value={s?.expiringSoon ?? '—'}
+          icon="clock"
+          tone="warn"
+        />
+        <StatCard
+          label="Истекшие"
+          value={s?.expired ?? '—'}
+          icon="alert"
+          tone="danger"
         />
       </div>
 
@@ -140,6 +197,42 @@ export function AdminDashboard() {
         >
           {importMut.isPending ? '…' : 'Запустить'}
         </Button>
+      </Card>
+
+      <Card className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+            <Icon name="clock" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Жизненный цикл клиентов</div>
+            <div className="text-xs text-tg-hint">
+              Авто-удаление через{' '}
+              <span className="font-medium text-tg-text">
+                {lifecycleCfg.data?.retentionDays ?? '—'} дн
+              </span>{' '}
+              после истечения.
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => expireMut.mutate()}
+            disabled={expireMut.isPending}
+          >
+            {expireMut.isPending ? '…' : 'Проверить истёкшие'}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => purgeMut.mutate()}
+            disabled={purgeMut.isPending}
+          >
+            {purgeMut.isPending ? '…' : 'Удалить старые'}
+          </Button>
+        </div>
       </Card>
     </div>
   );

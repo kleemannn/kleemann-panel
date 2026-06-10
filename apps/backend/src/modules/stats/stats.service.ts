@@ -39,12 +39,22 @@ export class StatsService {
   }
 
   async summaryForAdmin() {
-    const [resellers, activeResellers, clients, activeClients] = await this.prisma.$transaction([
-      this.prisma.reseller.count(),
-      this.prisma.reseller.count({ where: { isActive: true } }),
-      this.prisma.client.count(),
-      this.prisma.client.count({ where: { status: ClientStatus.ACTIVE } }),
-    ]);
-    return { resellers, activeResellers, clients, activeClients };
+    const now = new Date();
+    const in7 = new Date(now.getTime() + 7 * 864e5);
+    const [resellers, activeResellers, clients, activeClients, expired, expiringSoon] =
+      await this.prisma.$transaction([
+        this.prisma.reseller.count(),
+        this.prisma.reseller.count({ where: { isActive: true } }),
+        this.prisma.client.count(),
+        this.prisma.client.count({ where: { status: ClientStatus.ACTIVE } }),
+        this.prisma.client.count({ where: { status: ClientStatus.EXPIRED } }),
+        this.prisma.client.count({
+          where: {
+            status: ClientStatus.ACTIVE,
+            expiresAt: { gte: now, lte: in7 },
+          },
+        }),
+      ]);
+    return { resellers, activeResellers, clients, activeClients, expired, expiringSoon };
   }
 }

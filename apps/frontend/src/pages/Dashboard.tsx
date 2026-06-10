@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useAuthStore } from '@/store/auth';
 import { formatDate, daysUntil } from '@/lib/format';
 import { ClientRow, ClientRowModel } from '@/components/ClientRow';
+import { useRetentionDays } from '@/lib/lifecycle';
 
 interface Summary {
   total: number;
@@ -20,6 +21,10 @@ interface Summary {
   resellerExpiresAt?: string | null;
 }
 
+// Reseller-side endpoint for retention is admin-only; the hook falls back to
+// the documented default (7d) so the cosmetic countdown on expired rows still
+// renders correctly for resellers.
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   const a = parts[0]?.[0] ?? '?';
@@ -29,6 +34,7 @@ function initials(name: string): string {
 
 export function Dashboard() {
   const me = useAuthStore((s) => s.me);
+  const retentionDays = useRetentionDays();
   const summary = useQuery({
     queryKey: ['stats', 'summary'],
     queryFn: async () => (await api.get<Summary>('/stats/summary')).data,
@@ -81,8 +87,13 @@ export function Dashboard() {
         <StatCard label="Всего" value={s?.total ?? '—'} hint={`Лимит ${s?.maxClients ?? '—'}`} icon="users" tone="accent" />
         <StatCard label="Активные" value={s?.active ?? '—'} icon="shield" tone="success" />
         <StatCard label="Истекают ≤7д" value={s?.expiringSoon ?? '—'} icon="clock" tone="warn" />
-        <StatCard label="Остаток квоты" value={s?.quotaRemaining ?? '—'} icon="spark" tone="neutral" />
+        <StatCard label="Истекшие" value={s?.expired ?? '—'} icon="alert" tone="danger" />
       </div>
+      {typeof s?.quotaRemaining === 'number' && (
+        <div className="text-xs text-tg-hint">
+          Остаток квоты: <span className="font-medium text-tg-text">{s.quotaRemaining}</span>
+        </div>
+      )}
 
       <Link to="/clients/new" className="block">
         <Button full size="lg">
@@ -110,7 +121,7 @@ export function Dashboard() {
         ) : (
           <div className="space-y-2">
             {expiring.data?.items.map((c) => (
-              <ClientRow key={c.id} c={c} />
+              <ClientRow key={c.id} c={c} retentionDays={retentionDays} />
             ))}
           </div>
         )}

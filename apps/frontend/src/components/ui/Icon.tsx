@@ -26,6 +26,7 @@ export type IconName =
   | 'shield'
   | 'device'
   | 'spark'
+  | 'alert'
   | 'logo';
 
 const PATHS: Record<IconName, string> = {
@@ -63,6 +64,8 @@ const PATHS: Record<IconName, string> = {
   device:
     'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 21h8M10 17v4M14 17v4',
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
+  alert:
+    'M12 3 1 22h22L12 3zM12 10v5M12 18v.01',
   logo:
     'M4 20V4h4l4 8 4-8h4v16h-3V9l-4 8h-2l-4-8v11H4z',
 };

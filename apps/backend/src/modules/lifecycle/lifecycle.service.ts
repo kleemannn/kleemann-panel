@@ -134,16 +134,52 @@ export class LifecycleService {
       });
       let deleted = 0;
       let errors = 0;
+      let raced = 0;
 
       for (const c of stale) {
         try {
+          // Re-verify status hasn't changed since `findMany` above —
+          // a reseller's `extend()` call between our findMany and this
+          // iteration would flip the row back to ACTIVE, and we MUST
+          // NOT call `remna.deleteUser` on a client that was just
+          // re-activated (Remnawave deletion is irreversible).
+          const fresh = await this.prisma.client.findUnique({
+            where: { id: c.id },
+            select: { status: true, expiresAt: true },
+          });
+          if (
+            !fresh ||
+            fresh.status !== ClientStatus.EXPIRED ||
+            !fresh.expiresAt ||
+            fresh.expiresAt.getTime() >= cutoff.getTime()
+          ) {
+            raced++;
+            continue;
+          }
+
           // Try to delete on Remnawave first. 404 = already gone, treat as success.
           try {
             await this.remna.deleteUser(c.remnawaveUuid);
           } catch (e) {
             if (this.errorStatus(e) !== 404) throw e;
           }
-          await this.prisma.client.delete({ where: { id: c.id } });
+
+          // Local delete is guarded by `status: EXPIRED` so a concurrent
+          // `extend()` that completed between our re-check above and this
+          // line is still safe — count will be 0 and we skip the audit
+          // entry. The Remnawave user is already gone in that scenario,
+          // but the local row stays consistent with whatever extend() set.
+          const localDel = await this.prisma.client.deleteMany({
+            where: { id: c.id, status: ClientStatus.EXPIRED },
+          });
+          if (localDel.count === 0) {
+            this.log.warn(
+              `purge: ${c.id} (${c.username}) was re-activated after Remnawave delete; local row left intact`,
+            );
+            errors++;
+            continue;
+          }
+
           await this.audit
             .log({
               actor: 'system:lifecycle',
@@ -168,6 +204,9 @@ export class LifecycleService {
           errors++;
           this.log.warn(`purge: failed to delete ${c.id}: ${(e as Error).message}`);
         }
+      }
+      if (raced > 0) {
+        this.log.log(`purge: skipped ${raced} client(s) that were re-activated mid-purge`);
       }
       return { deleted, errors, retentionDays };
     } finally {

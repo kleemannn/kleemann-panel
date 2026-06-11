@@ -3,17 +3,22 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ClientStatus } from '@prisma/client';
+import { ClientStatus, Role } from '@prisma/client';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { ExtendClientDto } from './dto/extend-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Controller('clients')
 export class ClientsController {
@@ -106,5 +111,13 @@ export class ClientsController {
     @Param('hwid') hwid: string,
   ) {
     return this.svc.deleteDevice(user, id, hwid);
+  }
+
+  @Post('bulk-reset-device-limits')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  bulkResetDeviceLimits() {
+    return this.svc.bulkResetDeviceLimits();
   }
 }

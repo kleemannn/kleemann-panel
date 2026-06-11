@@ -240,7 +240,7 @@ export class BackupService {
           activeInternalSquads: [squadUuid],
           description: `reseller:${resellerId}${c.note ? ` | ${c.note}` : ''}`,
           telegramId: c.telegramId ? Number(c.telegramId) : undefined,
-          hwidDeviceLimit: 1,
+          hwidDeviceLimit: 0,
           tag: reseller.tag ?? undefined,
         });
 

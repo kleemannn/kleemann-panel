@@ -48,6 +48,18 @@ export function AdminDashboard() {
     onError: () => tgHapticError(),
   });
 
+  const resetDeviceLimitsMut = useMutation({
+    mutationFn: async () =>
+      (await api.post<{ updated: number; errors: number }>('/clients/bulk-reset-device-limits'))
+        .data,
+    onSuccess: (r) => {
+      tgHapticSuccess();
+      const msg = `Сброшено: ${r.updated}, ошибок: ${r.errors}`;
+      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+    },
+    onError: () => tgHapticError(),
+  });
+
   return (
     <div className="space-y-5 p-4">
       <section className="brand-gradient rounded-3xl p-5 text-tg-buttonText shadow-sm">
@@ -139,6 +151,23 @@ export function AdminDashboard() {
           disabled={importMut.isPending}
         >
           {importMut.isPending ? '…' : 'Запустить'}
+        </Button>
+      </Card>
+
+      <Card className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+          <Icon name="shield" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Сбросить лимит устройств</div>
+          <div className="text-xs text-tg-hint">Установить 0 (безлимит) у всех клиентов.</div>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => resetDeviceLimitsMut.mutate()}
+          disabled={resetDeviceLimitsMut.isPending}
+        >
+          {resetDeviceLimitsMut.isPending ? '…' : 'Сбросить'}
         </Button>
       </Card>
     </div>

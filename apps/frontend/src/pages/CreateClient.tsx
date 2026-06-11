@@ -25,7 +25,7 @@ export function CreateClient() {
   const [unlimited, setUnlimited] = useState(true);
   const [trafficGb, setTrafficGb] = useState<string>('100');
   const [note, setNote] = useState('');
-  const [deviceLimit, setDeviceLimit] = useState<string>('1');
+  const [deviceLimit, setDeviceLimit] = useState<string>('0');
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -127,7 +127,7 @@ export function CreateClient() {
           max={100}
           value={deviceLimit}
           onChange={(e) => setDeviceLimit(e.target.value)}
-          hint="1 = одно устройство, 0 = безлимит"
+          hint="0 = безлимит (по умолчанию), 1+ = ограничение"
         />
       )}
 

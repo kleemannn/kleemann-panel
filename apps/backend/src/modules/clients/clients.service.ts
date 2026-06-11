@@ -143,7 +143,7 @@ export class ClientsService {
       activeInternalSquads: [squadUuid],
       description: `reseller:${resellerId}${dto.note ? ` | ${dto.note}` : ''}`,
       telegramId: dto.clientTelegramId ? Number(dto.clientTelegramId) : undefined,
-      hwidDeviceLimit: dto.hwidDeviceLimit ?? 1,
+      hwidDeviceLimit: dto.hwidDeviceLimit ?? 0,
       tag: reseller.tag ?? undefined,
     });
 
@@ -480,6 +480,31 @@ export class ClientsService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Bulk-reset hwidDeviceLimit to 0 (unlimited) for ALL clients in Remnawave.
+   * Admin-only. Returns counts of updated/errored clients.
+   */
+  async bulkResetDeviceLimits(): Promise<{ updated: number; errors: number }> {
+    const clients = await this.prisma.client.findMany({
+      select: { id: true, remnawaveUuid: true, username: true },
+    });
+    let updated = 0;
+    let errors = 0;
+    for (const c of clients) {
+      try {
+        await this.remna.updateUser(c.remnawaveUuid, { hwidDeviceLimit: 0 });
+        updated++;
+      } catch (e) {
+        this.log.warn(
+          `bulk-reset-device-limit: failed for ${c.username}: ${(e as Error).message}`,
+        );
+        errors++;
+      }
+    }
+    this.log.log(`bulk-reset-device-limit: updated=${updated}, errors=${errors}`);
+    return { updated, errors };
   }
 
   /**

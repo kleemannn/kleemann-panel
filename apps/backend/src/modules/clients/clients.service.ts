@@ -89,14 +89,20 @@ export class ClientsService {
   }
 
   async getById(user: JwtUser, id: string) {
+    const isAdmin = user.role === 'ADMIN';
+    // Only join the reseller for admins. The UI conditionally renders an
+    // admin-only "Реселлер → /admin/resellers/:id" link whenever this field is
+    // present, so leaking it to plain resellers shows them a broken link.
     const c = await this.prisma.client.findUnique({
       where: { id },
-      include: {
-        reseller: { select: { id: true, username: true, tag: true } },
-        providerIdEntry: { select: { id: true, providerId: true, label: true } },
-      },
+      include: isAdmin
+        ? {
+            reseller: { select: { id: true, username: true, tag: true } },
+            providerIdEntry: { select: { id: true, providerId: true, label: true } },
+          }
+        : undefined,
     });
-    if (!c || (user.role !== 'ADMIN' && c.resellerId !== user.sub))
+    if (!c || (!isAdmin && c.resellerId !== user.sub))
       throw new NotFoundException('Client not found');
     return this.serialize(c);
   }

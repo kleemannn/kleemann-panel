@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -81,5 +83,14 @@ export class ResellersController {
     @Param('entryId') entryId: string,
   ) {
     return this.svc.removeProviderId(user.sub, resellerId, entryId);
+  }
+
+  @Post(':id/provider-ids/redistribute')
+  @HttpCode(HttpStatus.OK)
+  redistributeProviderIds(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    return this.svc.redistributeProviderIds(user.sub, id);
   }
 }

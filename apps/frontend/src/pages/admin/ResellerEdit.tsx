@@ -107,6 +107,22 @@ export function ResellerEdit() {
     onError: () => tgHapticError(),
   });
 
+  const redistributeMut = useMutation({
+    mutationFn: async () =>
+      (await api.post<{ total: number; assigned: number; skipped: number }>(
+        `/admin/resellers/${id}/provider-ids/redistribute`,
+      )).data,
+    onSuccess: (data) => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['admin', 'reseller', id, 'provider-ids'] });
+      const msg = data.skipped > 0
+        ? `Распределено ${data.assigned} из ${data.total}. Не хватило места для ${data.skipped}.`
+        : `Распределено ${data.assigned} клиент(ов).`;
+      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+    },
+    onError: () => tgHapticError(),
+  });
+
   const delMut = useMutation({
     mutationFn: async () => {
       await api.delete(`/admin/resellers/${id}`);
@@ -132,6 +148,7 @@ export function ResellerEdit() {
   const pool = poolQ.data ?? [];
   const totalCapacity = pool.length * 20;
   const totalUsed = pool.reduce((s, e) => s + e.clientsCount, 0);
+  const unassigned = q.data.clientsCount - totalUsed;
 
   return (
     <div className="space-y-4 p-4">
@@ -277,6 +294,24 @@ export function ResellerEdit() {
             <Icon name="plus" size={16} />
           </Button>
         </div>
+
+        {pool.length > 0 && unassigned > 0 && (
+          <Card className="space-y-2">
+            <div className="text-xs text-amber-600">
+              {unassigned} клиент{unassigned === 1 ? '' : unassigned < 5 ? 'а' : 'ов'} без
+              Provider ID — подписки используют старый формат.
+            </div>
+            <Button
+              full
+              size="sm"
+              onClick={() => redistributeMut.mutate()}
+              disabled={redistributeMut.isPending}
+            >
+              <Icon name="refresh" size={16} />{' '}
+              {redistributeMut.isPending ? 'Распределяем…' : 'Распределить по пулу'}
+            </Button>
+          </Card>
+        )}
       </section>
 
       <Button

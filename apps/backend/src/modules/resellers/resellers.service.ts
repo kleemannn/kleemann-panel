@@ -305,6 +305,59 @@ export class ResellersService {
     return { ok: true };
   }
 
+  async redistributeProviderIds(adminId: string, resellerId: string) {
+    const r = await this.prisma.reseller.findUnique({ where: { id: resellerId } });
+    if (!r) throw new NotFoundException('Reseller not found');
+
+    const entries = await this.prisma.providerIdEntry.findMany({
+      where: { resellerId },
+      include: { _count: { select: { clients: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (entries.length === 0) {
+      throw new BadRequestException('No Provider IDs in pool. Add at least one first.');
+    }
+
+    const unassigned = await this.prisma.client.findMany({
+      where: { resellerId, providerIdEntryId: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const CAPACITY = 20;
+    const counts = new Map(entries.map((e) => [e.id, e._count.clients]));
+    let assigned = 0;
+    let skipped = 0;
+
+    for (const client of unassigned) {
+      const best = entries
+        .filter((e) => (counts.get(e.id) ?? 0) < CAPACITY)
+        .sort((a, b) => (counts.get(a.id) ?? 0) - (counts.get(b.id) ?? 0));
+
+      if (best.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const target = best[0];
+      await this.prisma.client.update({
+        where: { id: client.id },
+        data: { providerIdEntryId: target.id },
+      });
+      counts.set(target.id, (counts.get(target.id) ?? 0) + 1);
+      assigned++;
+    }
+
+    await this.audit.log({
+      actor: `admin:${adminId}`,
+      resellerId,
+      action: 'provider-id.redistribute',
+      payload: { total: unassigned.length, assigned, skipped },
+    });
+
+    return { total: unassigned.length, assigned, skipped };
+  }
+
   async remove(adminId: string, id: string) {
     const r = await this.prisma.reseller.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Reseller not found');

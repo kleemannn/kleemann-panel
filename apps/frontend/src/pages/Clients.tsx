@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -33,19 +33,45 @@ interface Reseller {
 
 export function Clients() {
   const isAdmin = useAuthStore((s) => s.me?.role) === 'ADMIN';
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Admin starts on a reseller picker; non-admin sees their own clients directly.
-  const [pickedReseller, setPickedReseller] = useState<Reseller | null>(null);
+  // Persist selected reseller in the URL so navigating back to /clients
+  // (e.g. after deleting a client) doesn't reset to the picker.
+  const resellerId = searchParams.get('resellerId');
 
-  if (isAdmin && !pickedReseller) {
-    return <AdminResellerPicker onPick={setPickedReseller} />;
+  // Fetch the reseller object when we have an ID in the URL.
+  const resellerQ = useQuery({
+    queryKey: ['admin', 'reseller', resellerId],
+    queryFn: async () =>
+      (await api.get<Reseller & { providerId?: string | null }>(`/admin/resellers/${resellerId}`)).data,
+    enabled: isAdmin && !!resellerId,
+  });
+
+  const pickedReseller: Reseller | null = resellerQ.data
+    ? {
+        id: resellerQ.data.id,
+        username: resellerQ.data.username,
+        firstName: resellerQ.data.firstName,
+        telegramId: resellerQ.data.telegramId,
+        tag: resellerQ.data.tag,
+        clientsCount: 0,
+        isActive: resellerQ.data.isActive ?? true,
+      }
+    : null;
+
+  if (isAdmin && !resellerId) {
+    return (
+      <AdminResellerPicker
+        onPick={(r) => setSearchParams({ resellerId: r.id })}
+      />
+    );
   }
 
   return (
     <ClientList
       isAdmin={isAdmin}
       reseller={pickedReseller}
-      onBack={isAdmin ? () => setPickedReseller(null) : undefined}
+      onBack={isAdmin ? () => setSearchParams({}) : undefined}
     />
   );
 }
@@ -259,6 +285,7 @@ function ClientList({
               key={c.id}
               c={isAdmin && reseller ? { ...c, reseller: null } : c}
               retentionDays={retentionDays}
+              resellerId={reseller?.id}
             />
           ))}
         </div>

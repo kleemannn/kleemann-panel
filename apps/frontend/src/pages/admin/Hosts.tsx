@@ -656,7 +656,16 @@ function PoolEditorModal({
 
   const removeAt = (i: number) => {
     setAddresses((a) => a.filter((_, idx) => idx !== i));
-    if (currentIdx >= addresses.length - 1) setCurrentIdx(Math.max(0, addresses.length - 2));
+    setCurrentIdx((cur) => {
+      // Removed item before the active one — shift active index left so it
+      // keeps pointing at the same address.
+      if (i < cur) return Math.max(0, cur - 1);
+      // Removed the active item itself — fall back to its previous neighbour
+      // (or 0 if we just emptied the head).
+      if (i === cur) return Math.max(0, cur - 1);
+      // Removed item *after* the active one — clamp to new last index.
+      return Math.min(cur, addresses.length - 2);
+    });
   };
 
   const err = saveMut.error as
@@ -792,11 +801,13 @@ function PoolEditorModal({
             <Button
               variant="danger"
               onClick={() => {
-                const ok = window.Telegram?.WebApp?.showConfirm?.(
-                  `Удалить пул "${tag}"?`,
-                  (accepted) => accepted && deleteMut.mutate(),
-                );
-                if (ok === undefined && window.confirm(`Удалить пул "${tag}"?`)) {
+                const webApp = window.Telegram?.WebApp;
+                if (webApp?.showConfirm) {
+                  webApp.showConfirm(
+                    `Удалить пул "${tag}"?`,
+                    (accepted) => accepted && deleteMut.mutate(),
+                  );
+                } else if (window.confirm(`Удалить пул "${tag}"?`)) {
                   deleteMut.mutate();
                 }
               }}

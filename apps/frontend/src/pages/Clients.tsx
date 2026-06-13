@@ -68,6 +68,16 @@ export function Clients() {
   }
 
   if (isAdmin && resellerId && !pickedReseller) {
+    if (resellerQ.isError) {
+      return (
+        <div className="space-y-2 p-4">
+          <p className="text-sm text-red-500">Не удалось загрузить реселлера</p>
+          <Button size="sm" variant="ghost" onClick={() => setSearchParams({})}>
+            <Icon name="chevronRight" size={16} className="rotate-180" /> Назад
+          </Button>
+        </div>
+      );
+    }
     return <div className="p-4 text-sm text-tg-hint">Загрузка…</div>;
   }
 

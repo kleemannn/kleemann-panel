@@ -118,7 +118,7 @@ export function ResellerEdit() {
       const msg = data.skipped > 0
         ? `Распределено ${data.assigned} из ${data.total}. Не хватило места для ${data.skipped}.`
         : `Распределено ${data.assigned} клиент(ов).`;
-      window.Telegram?.WebApp?.showAlert?.(msg) ?? alert(msg);
+      window.Telegram?.WebApp?.showAlert ? window.Telegram.WebApp.showAlert(msg) : alert(msg);
     },
     onError: () => tgHapticError(),
   });

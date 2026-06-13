@@ -13,6 +13,7 @@ import { Role } from '@prisma/client';
 import { ResellersService } from './resellers.service';
 import { CreateResellerDto } from './dto/create-reseller.dto';
 import { UpdateResellerDto } from './dto/update-reseller.dto';
+import { AddProviderIdDto } from './dto/add-provider-id.dto';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -55,5 +56,30 @@ export class ResellersController {
   @Post('import-clients')
   importClients(@CurrentUser() user: JwtUser) {
     return this.svc.importFromRemnawave(user.sub);
+  }
+
+  // ---- Provider ID pool ----
+
+  @Get(':id/provider-ids')
+  listProviderIds(@Param('id') id: string) {
+    return this.svc.listProviderIds(id);
+  }
+
+  @Post(':id/provider-ids')
+  addProviderId(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddProviderIdDto,
+  ) {
+    return this.svc.addProviderId(user.sub, id, dto.providerId, dto.label);
+  }
+
+  @Delete(':resellerId/provider-ids/:entryId')
+  removeProviderId(
+    @CurrentUser() user: JwtUser,
+    @Param('resellerId') resellerId: string,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.svc.removeProviderId(user.sub, resellerId, entryId);
   }
 }

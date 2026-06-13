@@ -46,32 +46,49 @@ model Reseller {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  clients     Client[]
-  auditLogs   AuditLog[]
+  clients          Client[]
+  providerIdEntries ProviderIdEntry[]
+  auditLogs        AuditLog[]
 
   @@index([role])
   @@index([type])
 }
 
+model ProviderIdEntry {
+  id          String   @id @default(uuid())
+  resellerId  String
+  reseller    Reseller @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  providerId  String
+  label       String?
+  createdAt   DateTime @default(now())
+
+  clients     Client[]
+
+  @@index([resellerId])
+}
+
 model Client {
-  id             String       @id @default(uuid())
-  resellerId     String
-  reseller       Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
-  remnawaveUuid  String       @unique
-  username       String       @unique
-  telegramId     BigInt?
-  note           String?
-  subscriptionUrl String?
-  shortUuid      String?
-  expiresAt      DateTime?
-  trafficLimitGb Int?                         // null = unlimited
-  squadUuid      String
-  status         ClientStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                String           @id @default(uuid())
+  resellerId        String
+  reseller          Reseller         @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  providerIdEntryId String?
+  providerIdEntry   ProviderIdEntry? @relation(fields: [providerIdEntryId], references: [id], onDelete: SetNull)
+  remnawaveUuid     String           @unique
+  username          String           @unique
+  telegramId        BigInt?
+  note              String?
+  subscriptionUrl   String?
+  shortUuid         String?
+  expiresAt         DateTime?
+  trafficLimitGb    Int?                         // null = unlimited
+  squadUuid         String
+  status            ClientStatus     @default(ACTIVE)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([resellerId])
   @@index([status])
+  @@index([providerIdEntryId])
 }
 
 // Mapping reseller type -> Remnawave internal squad UUID.

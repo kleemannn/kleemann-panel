@@ -20,6 +20,7 @@ interface Client {
   subscriptionUrl?: string | null;
   // Joined-in by backend only when the viewer is ADMIN.
   reseller?: { id: string; username?: string | null; tag?: string | null } | null;
+  providerIdEntry?: { id: string; providerId: string; label?: string | null } | null;
 }
 
 interface HwidDevice {
@@ -230,6 +231,16 @@ export function ClientDetails() {
                 </Link>
               }
               wide
+            />
+          )}
+          {c.providerIdEntry && (
+            <Field
+              label="Provider ID"
+              value={
+                <span className="font-mono text-xs">
+                  {c.providerIdEntry.providerId}
+                </span>
+              }
             />
           )}
           <Field label="Заметка" value={c.note || '—'} wide />

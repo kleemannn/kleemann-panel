@@ -24,6 +24,13 @@ interface Reseller {
   isActive: boolean;
 }
 
+interface ProviderIdEntry {
+  id: string;
+  providerId: string;
+  label?: string | null;
+  clientsCount: number;
+}
+
 export function ResellerEdit() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
@@ -34,12 +41,18 @@ export function ResellerEdit() {
     queryFn: async () => (await api.get<Reseller>(`/admin/resellers/${id}`)).data,
   });
 
+  const poolQ = useQuery({
+    queryKey: ['admin', 'reseller', id, 'provider-ids'],
+    queryFn: async () =>
+      (await api.get<ProviderIdEntry[]>(`/admin/resellers/${id}/provider-ids`)).data,
+  });
+
   const [type, setType] = useState<'STANDARD' | 'PREMIUM'>('STANDARD');
   const [maxClients, setMaxClients] = useState('50');
   const [expiresAt, setExpiresAt] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [tag, setTag] = useState('');
-  const [providerId, setProviderId] = useState('');
+  const [newProviderId, setNewProviderId] = useState('');
 
   useEffect(() => {
     if (q.data) {
@@ -48,7 +61,6 @@ export function ResellerEdit() {
       setExpiresAt(q.data.expiresAt ? q.data.expiresAt.slice(0, 10) : '');
       setIsActive(q.data.isActive);
       setTag(q.data.tag ?? '');
-      setProviderId(q.data.providerId ?? '');
     }
   }, [q.data]);
 
@@ -60,13 +72,37 @@ export function ResellerEdit() {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         isActive,
         tag: tag || '',
-        providerId: providerId.trim() || '',
       });
     },
     onSuccess: () => {
       tgHapticSuccess();
       qc.invalidateQueries({ queryKey: ['admin', 'reseller', id] });
       qc.invalidateQueries({ queryKey: ['admin', 'resellers'] });
+    },
+    onError: () => tgHapticError(),
+  });
+
+  const addPidMut = useMutation({
+    mutationFn: async () => {
+      await api.post(`/admin/resellers/${id}/provider-ids`, {
+        providerId: newProviderId.trim(),
+      });
+    },
+    onSuccess: () => {
+      tgHapticSuccess();
+      setNewProviderId('');
+      qc.invalidateQueries({ queryKey: ['admin', 'reseller', id, 'provider-ids'] });
+    },
+    onError: () => tgHapticError(),
+  });
+
+  const removePidMut = useMutation({
+    mutationFn: async (entryId: string) => {
+      await api.delete(`/admin/resellers/${id}/provider-ids/${entryId}`);
+    },
+    onSuccess: () => {
+      tgHapticSuccess();
+      qc.invalidateQueries({ queryKey: ['admin', 'reseller', id, 'provider-ids'] });
     },
     onError: () => tgHapticError(),
   });
@@ -92,6 +128,10 @@ export function ResellerEdit() {
     q.data.maxClients > 0
       ? Math.min(100, Math.round((q.data.clientsCount / q.data.maxClients) * 100))
       : 0;
+
+  const pool = poolQ.data ?? [];
+  const totalCapacity = pool.length * 20;
+  const totalUsed = pool.reduce((s, e) => s + e.clientsCount, 0);
 
   return (
     <div className="space-y-4 p-4">
@@ -139,13 +179,6 @@ export function ResellerEdit() {
         }
       />
       <Input
-        label="Provider ID"
-        placeholder="необязательно"
-        hint="Идентификатор провайдера, задаёт админ. Пусто = убрать."
-        value={providerId}
-        onChange={(e) => setProviderId(e.target.value)}
-      />
-      <Input
         label="Действует до"
         hint="Пусто = бессрочно"
         type="date"
@@ -171,6 +204,80 @@ export function ResellerEdit() {
       <Button full size="lg" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
         <Icon name="check" /> {saveMut.isPending ? 'Сохраняем…' : 'Сохранить'}
       </Button>
+
+      {/* Provider ID Pool */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-tg-hint">
+            Provider ID&apos;ы
+          </h2>
+          {pool.length > 0 && (
+            <span className="text-xs font-medium tabular-nums text-tg-hint">
+              {totalUsed} / {totalCapacity} клиентов
+            </span>
+          )}
+        </div>
+
+        {pool.length === 0 && (
+          <p className="text-xs text-tg-hint">
+            Нет Provider ID. Добавьте — клиенты будут распределяться автоматически (до 20 на каждый).
+          </p>
+        )}
+
+        {pool.map((entry) => {
+          const full = entry.clientsCount >= 20;
+          return (
+            <Card key={entry.id} className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium font-mono">{entry.providerId}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-tg-hint">
+                  <span
+                    className={`font-medium tabular-nums ${full ? 'text-red-500' : 'text-tg-text'}`}
+                  >
+                    {entry.clientsCount}/20
+                  </span>
+                  {full && <span className="text-red-500">заполнен</span>}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const webApp = window.Telegram?.WebApp;
+                  if (webApp?.showConfirm) {
+                    webApp.showConfirm(
+                      `Удалить Provider ID ${entry.providerId}?`,
+                      (ok) => ok && removePidMut.mutate(entry.id),
+                    );
+                  } else if (window.confirm(`Удалить Provider ID ${entry.providerId}?`)) {
+                    removePidMut.mutate(entry.id);
+                  }
+                }}
+                className="shrink-0 rounded-full p-2 text-red-500 hover:bg-red-500/10"
+              >
+                <Icon name="trash" size={16} />
+              </button>
+            </Card>
+          );
+        })}
+
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              placeholder="Новый Provider ID"
+              value={newProviderId}
+              onChange={(e) => setNewProviderId(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={() => addPidMut.mutate()}
+            disabled={addPidMut.isPending || !newProviderId.trim()}
+            className="mt-1 shrink-0"
+          >
+            <Icon name="plus" size={16} />
+          </Button>
+        </div>
+      </section>
 
       <Button
         full

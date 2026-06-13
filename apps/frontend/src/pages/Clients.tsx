@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ClientRow, ClientRowModel } from '@/components/ClientRow';
 import { useAuthStore } from '@/store/auth';
+import { useRetentionDays } from '@/lib/lifecycle';
 
 type Status = '' | 'ACTIVE' | 'EXPIRED' | 'DISABLED' | 'LIMITED';
 
@@ -162,6 +163,7 @@ function ClientList({
 }) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Status>('');
+  const retentionDays = useRetentionDays();
 
   const q = useQuery({
     queryKey: ['clients', { search, status, resellerId: reseller?.id ?? null }],
@@ -253,15 +255,27 @@ function ClientList({
           {q.data.items.map((c) => (
             // When viewing one reseller's clients, hide the inline reseller
             // line on each row — it would just repeat the page header.
-            <ClientRow key={c.id} c={isAdmin && reseller ? { ...c, reseller: null } : c} />
+            <ClientRow
+              key={c.id}
+              c={isAdmin && reseller ? { ...c, reseller: null } : c}
+              retentionDays={retentionDays}
+            />
           ))}
         </div>
       ) : (
         <Card className="flex flex-col items-center gap-2 py-8 text-center">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-hint/10 text-tg-hint">
-            <Icon name="users" />
+            <Icon name={status === 'EXPIRED' ? 'alert' : 'users'} />
           </span>
-          <p className="text-sm text-tg-hint">Ничего не найдено</p>
+          <p className="text-sm text-tg-hint">
+            {status === 'EXPIRED'
+              ? retentionDays > 0
+                ? `Нет истёкших клиентов. Они появятся здесь автоматически после окончания подписки и удалятся через ${retentionDays} дн., если не продлить.`
+                : 'Нет истёкших клиентов. Они появятся здесь автоматически после окончания подписки.'
+              : status === 'DISABLED'
+                ? 'Нет отключённых клиентов.'
+                : 'Ничего не найдено'}
+          </p>
         </Card>
       )}
     </div>

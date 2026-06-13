@@ -22,24 +22,44 @@ function initials(name: string): string {
   return (second ? first + second : first).toUpperCase();
 }
 
-export function ClientRow({ c }: { c: ClientRowModel }) {
+// Default if backend hasn't sent us its config yet — purely cosmetic countdown.
+const DEFAULT_RETENTION_DAYS = 7;
+
+export function ClientRow({
+  c,
+  retentionDays = DEFAULT_RETENTION_DAYS,
+}: {
+  c: ClientRowModel;
+  retentionDays?: number;
+}) {
   const d = daysUntil(c.expiresAt ?? null);
+  // For expired clients we replace "истёк X дн назад" with the more
+  // actionable "удалится через Y дн" so the reseller sees the deadline
+  // for renewing before auto-purge kicks in.
+  const willPurge =
+    c.status === 'EXPIRED' && d !== null && retentionDays > 0 ? retentionDays + d : null;
   const deadlineText =
-    d === null
-      ? null
-      : d < 0
-        ? `${-d} дн. назад`
-        : d === 0
-          ? 'сегодня'
-          : `через ${d} дн.`;
+    willPurge !== null
+      ? willPurge <= 0
+        ? 'удалится скоро'
+        : `удалится через ${willPurge} дн.`
+      : d === null
+        ? null
+        : d < 0
+          ? `${-d} дн. назад`
+          : d === 0
+            ? 'сегодня'
+            : `через ${d} дн.`;
   const deadlineTone =
-    d === null
-      ? 'text-tg-hint'
-      : d < 0
-        ? 'text-red-500'
-        : d <= 7
-          ? 'text-amber-600'
-          : 'text-tg-hint';
+    willPurge !== null
+      ? 'text-red-500'
+      : d === null
+        ? 'text-tg-hint'
+        : d < 0
+          ? 'text-red-500'
+          : d <= 7
+            ? 'text-amber-600'
+            : 'text-tg-hint';
 
   return (
     <Link

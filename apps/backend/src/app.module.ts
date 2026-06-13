@@ -11,6 +11,7 @@ import { StatsModule } from './modules/stats/stats.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { HostsModule } from './modules/hosts/hosts.module';
 import { TelegramBotModule } from './modules/telegram-bot/telegram-bot.module';
 import { MeModule } from './modules/me/me.module';
@@ -32,6 +33,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     AuditModule,
     BackupModule,
     SyncModule,
+    LifecycleModule,
     HostsModule,
     TelegramBotModule,
   ],

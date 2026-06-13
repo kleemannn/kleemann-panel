@@ -26,14 +26,12 @@ ALTER TABLE "ProviderIdEntry" ADD CONSTRAINT "ProviderIdEntry_resellerId_fkey"
 ALTER TABLE "Client" ADD CONSTRAINT "Client_providerIdEntryId_fkey"
     FOREIGN KEY ("providerIdEntryId") REFERENCES "ProviderIdEntry"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- Migrate existing: for each reseller with a providerId, create a ProviderIdEntry
--- and link all their clients to it.
+-- Migrate existing: for each reseller with a providerId, create a ProviderIdEntry.
+-- Existing clients are NOT linked here — they keep providerIdEntryId=NULL and
+-- fall back to the legacy reseller.providerId in the subscription URL logic.
+-- This avoids exceeding the 20-client-per-entry capacity for resellers that
+-- already have more than 20 clients.
 INSERT INTO "ProviderIdEntry" ("id", "resellerId", "providerId", "label", "createdAt")
 SELECT gen_random_uuid(), "id", "providerId", NULL, NOW()
 FROM "Reseller"
 WHERE "providerId" IS NOT NULL AND "providerId" != '';
-
-UPDATE "Client" c
-SET "providerIdEntryId" = p."id"
-FROM "ProviderIdEntry" p
-WHERE p."resellerId" = c."resellerId";

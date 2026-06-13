@@ -269,12 +269,19 @@ export class ResellersService {
     }));
   }
 
-  async addProviderId(resellerId: string, providerId: string, label?: string) {
+  async addProviderId(adminId: string, resellerId: string, providerId: string, label?: string) {
     const r = await this.prisma.reseller.findUnique({ where: { id: resellerId } });
     if (!r) throw new NotFoundException('Reseller not found');
     if (!providerId?.trim()) throw new BadRequestException('providerId is required');
     const entry = await this.prisma.providerIdEntry.create({
       data: { resellerId, providerId: providerId.trim(), label: label?.trim() || null },
+    });
+    await this.audit.log({
+      actor: `admin:${adminId}`,
+      resellerId,
+      action: 'provider-id.create',
+      targetId: entry.id,
+      payload: { providerId: entry.providerId },
     });
     return entry;
   }

@@ -91,7 +91,10 @@ export class ClientsService {
   async getById(user: JwtUser, id: string) {
     const c = await this.prisma.client.findUnique({
       where: { id },
-      include: { reseller: { select: { id: true, username: true, tag: true } } },
+      include: {
+        reseller: { select: { id: true, username: true, tag: true } },
+        providerIdEntry: { select: { id: true, providerId: true, label: true } },
+      },
     });
     if (!c || (user.role !== 'ADMIN' && c.resellerId !== user.sub))
       throw new NotFoundException('Client not found');
@@ -135,6 +138,9 @@ export class ClientsService {
 
     const squadUuid = await this.squads.getSquadUuidForType(reseller.type);
 
+    // Auto-assign Provider ID with capacity (max 20 clients per entry)
+    const assignedEntry = await this.pickProviderIdEntry(resellerId);
+
     const remna = await this.remna.createUser({
       username: dto.username,
       expireAt: expireAt.toISOString(),
@@ -152,6 +158,7 @@ export class ClientsService {
       client = await this.prisma.client.create({
         data: {
           resellerId,
+          providerIdEntryId: assignedEntry?.id ?? null,
           remnawaveUuid: remna.uuid,
           shortUuid: remna.shortUuid,
           username: remna.username,
@@ -338,18 +345,26 @@ export class ClientsService {
     //        https://{COVER}/sub/{shortUuid}#?resolve-address={COVER}&host={BACKEND}&providerid={providerId}
     //      form. Only available when HAPP_COVER_HOST + HAPP_BACKEND_HOST env
     //      vars are set; otherwise `google.*` fields are null.
-    // Provider ID belongs to the OWNING reseller, not the requester — when an
-    // admin views someone else's client, we still want their providerid baked
-    // into the Google cover URL.
-    const reseller = await this.prisma.reseller.findUnique({
-      where: { id: c.resellerId },
-      select: { providerId: true },
-    });
+    // Provider ID comes from the client's assigned ProviderIdEntry (pool).
+    // Falls back to the legacy reseller.providerId for backward compat.
+    const providerIdEntry = c.providerIdEntryId
+      ? await this.prisma.providerIdEntry.findUnique({
+          where: { id: c.providerIdEntryId },
+          select: { providerId: true },
+        })
+      : null;
+    const reseller = !providerIdEntry
+      ? await this.prisma.reseller.findUnique({
+          where: { id: c.resellerId },
+          select: { providerId: true },
+        })
+      : null;
+    const effectiveProviderId = providerIdEntry?.providerId ?? reseller?.providerId ?? null;
     const shortUuid =
       (remna.shortUuid as string | undefined | null) ??
       c.shortUuid ??
       this.extractShortUuid(rawSubscriptionUrl);
-    const googleUrl = this.buildHappCoverUrl(shortUuid, reseller?.providerId ?? null);
+    const googleUrl = this.buildHappCoverUrl(shortUuid, effectiveProviderId);
 
     const plain = await this.buildSubscriptionVariant(c, rawSubscriptionUrl, 'plain');
     const google = googleUrl
@@ -491,6 +506,35 @@ export class ClientsService {
     if (!c || (user.role !== 'ADMIN' && c.resellerId !== user.sub))
       throw new NotFoundException('Client not found');
     return c;
+  }
+
+  private static readonly PROVIDER_ID_CAPACITY = 20;
+
+  /**
+   * Pick the ProviderIdEntry with the fewest assigned clients (< 20).
+   * Returns null when the reseller has no pool entries at all (legacy mode —
+   * subscription URL falls back to reseller.providerId).
+   * Throws when all entries are full.
+   */
+  private async pickProviderIdEntry(resellerId: string) {
+    const entries = await this.prisma.providerIdEntry.findMany({
+      where: { resellerId },
+      include: { _count: { select: { clients: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (entries.length === 0) return null;
+
+    const available = entries
+      .map((e) => ({ id: e.id, providerId: e.providerId, count: e._count.clients }))
+      .filter((e) => e.count < ClientsService.PROVIDER_ID_CAPACITY)
+      .sort((a, b) => a.count - b.count);
+
+    if (available.length === 0) {
+      throw new ForbiddenException(
+        `All Provider IDs are full (${ClientsService.PROVIDER_ID_CAPACITY} clients each). Ask admin to add more.`,
+      );
+    }
+    return available[0];
   }
 
   /** Audit `actor` string distinguishes admin actions from reseller actions. */

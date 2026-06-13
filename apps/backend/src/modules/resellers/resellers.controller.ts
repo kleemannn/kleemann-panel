@@ -56,4 +56,28 @@ export class ResellersController {
   importClients(@CurrentUser() user: JwtUser) {
     return this.svc.importFromRemnawave(user.sub);
   }
+
+  // ---- Provider ID pool ----
+
+  @Get(':id/provider-ids')
+  listProviderIds(@Param('id') id: string) {
+    return this.svc.listProviderIds(id);
+  }
+
+  @Post(':id/provider-ids')
+  addProviderId(
+    @Param('id') id: string,
+    @Body() body: { providerId: string; label?: string },
+  ) {
+    return this.svc.addProviderId(id, body.providerId, body.label);
+  }
+
+  @Delete(':resellerId/provider-ids/:entryId')
+  removeProviderId(
+    @CurrentUser() user: JwtUser,
+    @Param('resellerId') resellerId: string,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.svc.removeProviderId(user.sub, resellerId, entryId);
+  }
 }

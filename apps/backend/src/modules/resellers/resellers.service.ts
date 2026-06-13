@@ -250,6 +250,54 @@ export class ResellersService {
     }
   }
 
+  // ---- Provider ID pool ----
+
+  async listProviderIds(resellerId: string) {
+    const r = await this.prisma.reseller.findUnique({ where: { id: resellerId } });
+    if (!r) throw new NotFoundException('Reseller not found');
+    const entries = await this.prisma.providerIdEntry.findMany({
+      where: { resellerId },
+      include: { _count: { select: { clients: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return entries.map((e) => ({
+      id: e.id,
+      providerId: e.providerId,
+      label: e.label,
+      clientsCount: e._count.clients,
+      createdAt: e.createdAt,
+    }));
+  }
+
+  async addProviderId(resellerId: string, providerId: string, label?: string) {
+    const r = await this.prisma.reseller.findUnique({ where: { id: resellerId } });
+    if (!r) throw new NotFoundException('Reseller not found');
+    if (!providerId?.trim()) throw new BadRequestException('providerId is required');
+    const entry = await this.prisma.providerIdEntry.create({
+      data: { resellerId, providerId: providerId.trim(), label: label?.trim() || null },
+    });
+    return entry;
+  }
+
+  async removeProviderId(adminId: string, resellerId: string, entryId: string) {
+    const entry = await this.prisma.providerIdEntry.findUnique({ where: { id: entryId } });
+    if (!entry || entry.resellerId !== resellerId) throw new NotFoundException('Entry not found');
+
+    await this.prisma.client.updateMany({
+      where: { providerIdEntryId: entryId },
+      data: { providerIdEntryId: null },
+    });
+    await this.prisma.providerIdEntry.delete({ where: { id: entryId } });
+    await this.audit.log({
+      actor: `admin:${adminId}`,
+      resellerId,
+      action: 'provider-id.delete',
+      targetId: entryId,
+      payload: { providerId: entry.providerId },
+    });
+    return { ok: true };
+  }
+
   async remove(adminId: string, id: string) {
     const r = await this.prisma.reseller.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Reseller not found');

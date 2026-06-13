@@ -67,6 +67,10 @@ export function Clients() {
     );
   }
 
+  if (isAdmin && resellerId && !pickedReseller) {
+    return <div className="p-4 text-sm text-tg-hint">Загрузка…</div>;
+  }
+
   return (
     <ClientList
       isAdmin={isAdmin}

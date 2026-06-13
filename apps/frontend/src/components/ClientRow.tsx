@@ -28,9 +28,11 @@ const DEFAULT_RETENTION_DAYS = 7;
 export function ClientRow({
   c,
   retentionDays = DEFAULT_RETENTION_DAYS,
+  resellerId,
 }: {
   c: ClientRowModel;
   retentionDays?: number;
+  resellerId?: string;
 }) {
   const d = daysUntil(c.expiresAt ?? null);
   // For expired clients we replace "истёк X дн назад" with the more
@@ -63,7 +65,7 @@ export function ClientRow({
 
   return (
     <Link
-      to={`/clients/${c.id}`}
+      to={resellerId ? `/clients/${c.id}?resellerId=${resellerId}` : `/clients/${c.id}`}
       className="group flex items-center gap-3 rounded-2xl bg-tg-secondary px-3 py-3 ring-1 ring-black/5 shadow-sm transition active:scale-[0.99]"
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-button/10 text-sm font-semibold text-tg-button">

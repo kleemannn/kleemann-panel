@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -107,6 +107,11 @@ export function ClientDetails() {
   const disable = runAction('disable');
   const enable = runAction('enable');
   const reset = runAction('reset-traffic');
+  // Preserve admin's reseller context so delete navigates back to the
+  // same reseller's client list rather than resetting to the picker.
+  const [sp] = useSearchParams();
+  const returnResellerId = sp.get('resellerId');
+
   const del = useMutation({
     mutationFn: async () => {
       await api.delete(`/clients/${id}`);
@@ -114,7 +119,8 @@ export function ClientDetails() {
     onSuccess: () => {
       tgHapticSuccess();
       qc.invalidateQueries({ queryKey: ['clients'] });
-      navigate('/clients');
+      const rid = returnResellerId ?? q.data?.reseller?.id;
+      navigate(rid ? `/clients?resellerId=${rid}` : '/clients');
     },
     onError: () => tgHapticError(),
   });

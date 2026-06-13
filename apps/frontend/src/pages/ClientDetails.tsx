@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge, ClientStatus } from '@/components/ui/StatusBadge';
 import { formatBytes, formatDate, formatDateTime, formatGb, daysUntil } from '@/lib/format';
 import { tgHapticSuccess, tgHapticError } from '@/lib/telegram';
+import { useRetentionDays } from '@/lib/lifecycle';
 
 interface Client {
   id: string;
@@ -19,6 +20,7 @@ interface Client {
   subscriptionUrl?: string | null;
   // Joined-in by backend only when the viewer is ADMIN.
   reseller?: { id: string; username?: string | null; tag?: string | null } | null;
+  providerIdEntry?: { id: string; providerId: string; label?: string | null } | null;
 }
 
 interface HwidDevice {
@@ -35,6 +37,7 @@ export function ClientDetails() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const retentionDays = useRetentionDays();
 
   const q = useQuery({
     queryKey: ['client', id],
@@ -162,6 +165,22 @@ export function ClientDetails() {
     <div className="space-y-5 p-4">
       <PageHeader title={c.username} back />
 
+      {c.status === 'EXPIRED' && retentionDays > 0 && d !== null && (
+        <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-700 ring-1 ring-red-500/20">
+          <div className="flex items-start gap-2">
+            <Icon name="alert" size={18} className="mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium">Подписка истекла</div>
+              <div className="mt-0.5 text-xs text-red-600/90">
+                {retentionDays + d > 0
+                  ? `Клиент будет автоматически удалён через ${retentionDays + d} дн., если не продлить.`
+                  : 'Клиент скоро будет автоматически удалён.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <StatusBadge status={c.status} />
@@ -212,6 +231,16 @@ export function ClientDetails() {
                 </Link>
               }
               wide
+            />
+          )}
+          {c.providerIdEntry && (
+            <Field
+              label="Provider ID"
+              value={
+                <span className="font-mono text-xs">
+                  {c.providerIdEntry.providerId}
+                </span>
+              }
             />
           )}
           <Field label="Заметка" value={c.note || '—'} wide />

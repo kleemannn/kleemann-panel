@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ClientRow, ClientRowModel } from '@/components/ClientRow';
 import { useAuthStore } from '@/store/auth';
+import { useRetentionDays } from '@/lib/lifecycle';
 
 type Status = '' | 'ACTIVE' | 'EXPIRED' | 'DISABLED' | 'LIMITED';
 
@@ -20,46 +21,43 @@ const STATUSES: { value: Status; label: string }[] = [
   { value: 'DISABLED', label: 'Отключённые' },
 ];
 
-interface ResellerOpt {
+interface Reseller {
   id: string;
   username?: string | null;
   firstName?: string | null;
   telegramId: string;
   tag?: string | null;
   clientsCount: number;
+  isActive: boolean;
 }
 
 export function Clients() {
   const isAdmin = useAuthStore((s) => s.me?.role) === 'ADMIN';
 
+  // Admin starts on a reseller picker; non-admin sees their own clients directly.
+  const [pickedReseller, setPickedReseller] = useState<Reseller | null>(null);
+
+  if (isAdmin && !pickedReseller) {
+    return <AdminResellerPicker onPick={setPickedReseller} />;
+  }
+
+  return (
+    <ClientList
+      isAdmin={isAdmin}
+      reseller={pickedReseller}
+      onBack={isAdmin ? () => setPickedReseller(null) : undefined}
+    />
+  );
+}
+
+function AdminResellerPicker({ onPick }: { onPick: (r: Reseller) => void }) {
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<Status>('');
-  const [resellerId, setResellerId] = useState<string>('');
-
   const q = useQuery({
-    queryKey: ['clients', { search, status, resellerId }],
+    queryKey: ['admin', 'resellers', 'picker', search],
     queryFn: async () =>
       (
-        await api.get<{ items: ClientRowModel[]; total: number }>('/clients', {
-          params: {
-            search: search || undefined,
-            status: status || undefined,
-            resellerId: resellerId || undefined,
-            take: 100,
-          },
-        })
-      ).data,
-  });
-
-  // Reseller filter chips are admin-only — fetched lazily so resellers don't
-  // pay the round-trip.
-  const resellersQ = useQuery({
-    enabled: isAdmin,
-    queryKey: ['admin', 'resellers', 'all'],
-    queryFn: async () =>
-      (
-        await api.get<{ items: ResellerOpt[] }>('/admin/resellers', {
-          params: { take: 200 },
+        await api.get<{ items: Reseller[] }>('/admin/resellers', {
+          params: { search: search || undefined, take: 200 },
         })
       ).data,
   });
@@ -68,13 +66,152 @@ export function Clients() {
     <div className="space-y-4 p-4">
       <PageHeader
         title="Клиенты"
-        subtitle={q.data ? `${q.data.total} всего` : undefined}
+        subtitle="Выберите реселлера"
         action={
           <Link to="/clients/new">
             <Button size="sm">
               <Icon name="plus" size={16} /> Новый
             </Button>
           </Link>
+        }
+      />
+
+      <div className="relative">
+        <Icon
+          name="search"
+          size={18}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tg-hint"
+        />
+        <Input
+          placeholder="Поиск реселлера"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {q.isLoading ? (
+        <Card>
+          <p className="text-sm text-tg-hint">Загрузка…</p>
+        </Card>
+      ) : q.data && q.data.items.length > 0 ? (
+        <div className="space-y-2">
+          {q.data.items.map((r) => {
+            const name = r.username
+              ? `@${r.username}`
+              : r.firstName ?? `tg:${r.telegramId}`;
+            return (
+              <button
+                key={r.id}
+                onClick={() => onPick(r)}
+                className="flex w-full items-center gap-3 rounded-2xl bg-tg-secondary px-3 py-3 text-left ring-1 ring-black/5 shadow-sm transition active:scale-[0.99]"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-button/10 text-tg-button">
+                  <Icon name="store" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-semibold">{name}</span>
+                    {r.tag && (
+                      <span className="rounded-full bg-tg-button/10 px-2 py-0.5 font-mono text-[10px] text-tg-button">
+                        {r.tag}
+                      </span>
+                    )}
+                    {!r.isActive && (
+                      <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600">
+                        выключен
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-xs text-tg-hint">
+                    {r.clientsCount} клиент{plural(r.clientsCount)}
+                  </div>
+                </div>
+                <Icon name="chevronRight" size={16} className="text-tg-hint" />
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="flex flex-col items-center gap-2 py-8 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-hint/10 text-tg-hint">
+            <Icon name="store" />
+          </span>
+          <p className="text-sm text-tg-hint">Нет реселлеров</p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function plural(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return '';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'а';
+  return 'ов';
+}
+
+function ClientList({
+  isAdmin,
+  reseller,
+  onBack,
+}: {
+  isAdmin: boolean;
+  reseller: Reseller | null;
+  onBack?: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<Status>('');
+  const retentionDays = useRetentionDays();
+
+  const q = useQuery({
+    queryKey: ['clients', { search, status, resellerId: reseller?.id ?? null }],
+    queryFn: async () =>
+      (
+        await api.get<{ items: ClientRowModel[]; total: number }>('/clients', {
+          params: {
+            search: search || undefined,
+            status: status || undefined,
+            resellerId: reseller?.id || undefined,
+            take: 100,
+          },
+        })
+      ).data,
+  });
+
+  const headerTitle = reseller
+    ? reseller.username
+      ? `@${reseller.username}`
+      : reseller.firstName ?? `tg:${reseller.telegramId}`
+    : 'Клиенты';
+
+  return (
+    <div className="space-y-4 p-4">
+      <PageHeader
+        title={headerTitle}
+        subtitle={
+          reseller
+            ? q.data
+              ? `${q.data.total} клиент${plural(q.data.total)}`
+              : undefined
+            : q.data
+              ? `${q.data.total} всего`
+              : undefined
+        }
+        action={
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <Button size="sm" variant="ghost" onClick={onBack}>
+                <Icon name="chevronRight" size={16} className="rotate-180" /> Реселлеры
+              </Button>
+            )}
+            <Link to="/clients/new">
+              <Button size="sm">
+                <Icon name="plus" size={16} /> Новый
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -109,46 +246,6 @@ export function Clients() {
         ))}
       </div>
 
-      {isAdmin && resellersQ.data && resellersQ.data.items.length > 0 && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar">
-          <button
-            onClick={() => setResellerId('')}
-            className={clsx(
-              'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ring-1',
-              resellerId === ''
-                ? 'bg-tg-button text-tg-buttonText ring-tg-button'
-                : 'bg-tg-secondary text-tg-hint ring-black/5 hover:text-tg-text',
-            )}
-          >
-            Все реселлеры
-          </button>
-          {resellersQ.data.items.map((r) => {
-            const label = r.username
-              ? `@${r.username}`
-              : r.firstName ?? `tg:${r.telegramId}`;
-            return (
-              <button
-                key={r.id}
-                onClick={() => setResellerId(r.id)}
-                className={clsx(
-                  'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ring-1',
-                  resellerId === r.id
-                    ? 'bg-tg-button text-tg-buttonText ring-tg-button'
-                    : 'bg-tg-secondary text-tg-hint ring-black/5 hover:text-tg-text',
-                )}
-              >
-                {label}
-                {r.tag && (
-                  <span className="ml-1.5 font-mono text-[10px] opacity-70">
-                    {r.tag}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {q.isLoading ? (
         <Card>
           <p className="text-sm text-tg-hint">Загрузка…</p>
@@ -156,15 +253,29 @@ export function Clients() {
       ) : q.data && q.data.items.length > 0 ? (
         <div className="space-y-2">
           {q.data.items.map((c) => (
-            <ClientRow key={c.id} c={c} />
+            // When viewing one reseller's clients, hide the inline reseller
+            // line on each row — it would just repeat the page header.
+            <ClientRow
+              key={c.id}
+              c={isAdmin && reseller ? { ...c, reseller: null } : c}
+              retentionDays={retentionDays}
+            />
           ))}
         </div>
       ) : (
         <Card className="flex flex-col items-center gap-2 py-8 text-center">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-hint/10 text-tg-hint">
-            <Icon name="users" />
+            <Icon name={status === 'EXPIRED' ? 'alert' : 'users'} />
           </span>
-          <p className="text-sm text-tg-hint">Ничего не найдено</p>
+          <p className="text-sm text-tg-hint">
+            {status === 'EXPIRED'
+              ? retentionDays > 0
+                ? `Нет истёкших клиентов. Они появятся здесь автоматически после окончания подписки и удалятся через ${retentionDays} дн., если не продлить.`
+                : 'Нет истёкших клиентов. Они появятся здесь автоматически после окончания подписки.'
+              : status === 'DISABLED'
+                ? 'Нет отключённых клиентов.'
+                : 'Ничего не найдено'}
+          </p>
         </Card>
       )}
     </div>
